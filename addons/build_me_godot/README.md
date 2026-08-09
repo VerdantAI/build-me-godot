@@ -36,6 +36,7 @@ See [LICENSES.md](LICENSES.md) before installing model weights or adding another
 
 See [Installation and environment checks](docs/environment-checks.md) for the editor workflow and deterministic agent/CLI interface.
 See [Agent setup guide](docs/agent-setup.md) for safe, copyable automation prompts and commands.
+See [Developer handoff](docs/handoff.md) for repository boundaries, current capabilities, and the next independent milestones.
 
 See [Store listing](docs/store-listing.md) for distribution copy and [Release checklist](docs/release-checklist.md) for the publishing gate.
 

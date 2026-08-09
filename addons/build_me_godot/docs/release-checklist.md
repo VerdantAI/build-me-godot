@@ -23,7 +23,8 @@ git diff --check
 - Test the dock at its narrowest practical width and at 100%, 150%, and 200% display scaling; prompts and reports must remain usable without horizontal clipping.
 - Confirm every check shows a textual `PASS`, `FAIL`, `WARNING`, `UNKNOWN`, or `SKIPPED` cue independent of color.
 - Run normal and deep checks, expand technical details, copy a report, and save a report.
-- Confirm Build Me Godot entries appear in global Editor Settings, the dock loads them, checks do not silently persist field edits, and the explicit save control does.
+- Confirm Build Me Godot entries appear in global Editor Settings, **Save for me** updates them, and **Save for this project** writes the gitignored local file.
+- Confirm environment and CLI overrides take precedence, every field reports its effective source, and a headless check reads the local file without `EditorInterface`.
 - Exercise a clean project and a configured project without changing external dependencies.
 
 ## Store media gate
