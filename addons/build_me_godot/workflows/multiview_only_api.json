@@ -1,0 +1,967 @@
+{
+  "prompt": {
+    "2": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "cropped head, cropped feet, missing limbs, extra limbs, crossed arms, crossed legs, action pose, contrapposto, foreshortening, wide angle, perspective distortion, dramatic lighting, hard cast shadow, cluttered background, handheld props, text, watermark"
+      },
+      "_meta": {
+        "title": "NEGATIVE / PRESERVATION CONSTRAINTS"
+      }
+    },
+    "3": {
+      "class_type": "PrimitiveInt",
+      "inputs": {
+        "value": 424242
+      },
+      "_meta": {
+        "title": "SEED"
+      }
+    },
+    "4": {
+      "class_type": "PrimitiveInt",
+      "inputs": {
+        "value": 768
+      },
+      "_meta": {
+        "title": "WIDTH"
+      }
+    },
+    "5": {
+      "class_type": "PrimitiveInt",
+      "inputs": {
+        "value": 1024
+      },
+      "_meta": {
+        "title": "HEIGHT"
+      }
+    },
+    "8": {
+      "class_type": "PrimitiveInt",
+      "inputs": {
+        "value": 4
+      },
+      "_meta": {
+        "title": "MULTIVIEW STEPS"
+      }
+    },
+    "9": {
+      "class_type": "PrimitiveFloat",
+      "inputs": {
+        "value": 1.0
+      },
+      "_meta": {
+        "title": "MULTIVIEW GUIDANCE"
+      }
+    },
+    "10": {
+      "class_type": "PrimitiveString",
+      "inputs": {
+        "value": "field_engineer"
+      },
+      "_meta": {
+        "title": "CHARACTER / OUTPUT NAME"
+      }
+    },
+    "11": {
+      "class_type": "PrimitiveFloat",
+      "inputs": {
+        "value": 1.0
+      },
+      "_meta": {
+        "title": "MULTIVIEW DENOISE STRENGTH"
+      }
+    },
+    "20": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        "type": "qwen_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "Qwen 2.5 VL Text Encoder"
+      }
+    },
+    "21": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "qwen_image_vae.safetensors"
+      },
+      "_meta": {
+        "title": "Qwen Image VAE"
+      }
+    },
+    "40": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "Qwen-Image-Edit-2511 FP8Mixed"
+      }
+    },
+    "41": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 3.1,
+        "model": [
+          "40",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Edit Sampling Shift"
+      }
+    },
+    "42": {
+      "class_type": "CFGNorm",
+      "inputs": {
+        "strength": 1.0,
+        "pre_cfg": false,
+        "model": [
+          "41",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Edit CFG Norm"
+      }
+    },
+    "43": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+        "strength_model": 1.0,
+        "model": [
+          "42",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Edit Four-Step Lightning LoRA"
+      }
+    },
+    "44": {
+      "class_type": "VAEEncode",
+      "inputs": {
+        "pixels": [
+          "200",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Canonical Reference Latent"
+      }
+    },
+    "45": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "2",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Shared Negative Preservation"
+      }
+    },
+    "46": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "45",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Negative Reference Method"
+      }
+    },
+    "110": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "Create an exact orthographic RIGHT SIDE view of the same character in Picture 1, camera azimuth +90 degrees from the original front view. Preserve the identical person, face, hairstyle, body proportions, neutral A-pose, garment construction, jacket length, belt, pockets, footwear, colors, materials, accessories, body scale, framing, camera elevation, plain background, and diffuse lighting. Show the right-facing profile with the full head and both feet visible. Do not redesign, add, remove, mirror, or beautify details."
+      },
+      "_meta": {
+        "title": "RIGHT CAMERA INSTRUCTION"
+      }
+    },
+    "50": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "110",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Condition right"
+      }
+    },
+    "60": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "50",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Reference right"
+      }
+    },
+    "70": {
+      "class_type": "KSampler",
+      "inputs": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "model": [
+          "43",
+          0
+        ],
+        "positive": [
+          "60",
+          0
+        ],
+        "negative": [
+          "46",
+          0
+        ],
+        "latent_image": [
+          "44",
+          0
+        ],
+        "seed": [
+          "3",
+          0
+        ],
+        "steps": [
+          "8",
+          0
+        ],
+        "cfg": [
+          "9",
+          0
+        ],
+        "denoise": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Generate right"
+      }
+    },
+    "80": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "70",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Decode right"
+      }
+    },
+    "90": {
+      "class_type": "TurnaroundNormalize",
+      "inputs": {
+        "image": [
+          "80",
+          0
+        ],
+        "width": [
+          "4",
+          0
+        ],
+        "height": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Normalize right"
+      }
+    },
+    "100": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "right",
+        "image": [
+          "90",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save right.png"
+      }
+    },
+    "111": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "Create an exact orthographic BACK view of the same character in Picture 1, camera azimuth 180 degrees from the original front view. Preserve the identical person, hairstyle, body proportions, neutral A-pose, garment construction, jacket length, belt, pockets, footwear, colors, materials, accessories, body scale, framing, camera elevation, plain background, and diffuse lighting. Infer only the physically necessary rear surfaces of the same clothing. Show the full head and both feet. Do not redesign, add, remove, mirror, or beautify details."
+      },
+      "_meta": {
+        "title": "BACK CAMERA INSTRUCTION"
+      }
+    },
+    "51": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "111",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Condition back"
+      }
+    },
+    "61": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "51",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Reference back"
+      }
+    },
+    "71": {
+      "class_type": "KSampler",
+      "inputs": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "model": [
+          "43",
+          0
+        ],
+        "positive": [
+          "61",
+          0
+        ],
+        "negative": [
+          "46",
+          0
+        ],
+        "latent_image": [
+          "44",
+          0
+        ],
+        "seed": [
+          "3",
+          0
+        ],
+        "steps": [
+          "8",
+          0
+        ],
+        "cfg": [
+          "9",
+          0
+        ],
+        "denoise": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Generate back"
+      }
+    },
+    "81": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "71",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Decode back"
+      }
+    },
+    "91": {
+      "class_type": "TurnaroundNormalize",
+      "inputs": {
+        "image": [
+          "81",
+          0
+        ],
+        "width": [
+          "4",
+          0
+        ],
+        "height": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Normalize back"
+      }
+    },
+    "101": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "back",
+        "image": [
+          "91",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save back.png"
+      }
+    },
+    "112": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "Create an exact orthographic LEFT SIDE view of the same character in Picture 1, camera azimuth -90 degrees from the original front view. Preserve the identical person, face, hairstyle, body proportions, neutral A-pose, garment construction, jacket length, belt, pockets, footwear, colors, materials, accessories, body scale, framing, camera elevation, plain background, and diffuse lighting. Show the left-facing profile with the full head and both feet visible. Do not redesign, add, remove, mirror, or beautify details."
+      },
+      "_meta": {
+        "title": "LEFT CAMERA INSTRUCTION"
+      }
+    },
+    "52": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "112",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Condition left"
+      }
+    },
+    "62": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "52",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Reference left"
+      }
+    },
+    "72": {
+      "class_type": "KSampler",
+      "inputs": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "model": [
+          "43",
+          0
+        ],
+        "positive": [
+          "62",
+          0
+        ],
+        "negative": [
+          "46",
+          0
+        ],
+        "latent_image": [
+          "44",
+          0
+        ],
+        "seed": [
+          "3",
+          0
+        ],
+        "steps": [
+          "8",
+          0
+        ],
+        "cfg": [
+          "9",
+          0
+        ],
+        "denoise": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Generate left"
+      }
+    },
+    "82": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "72",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Decode left"
+      }
+    },
+    "92": {
+      "class_type": "TurnaroundNormalize",
+      "inputs": {
+        "image": [
+          "82",
+          0
+        ],
+        "width": [
+          "4",
+          0
+        ],
+        "height": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Normalize left"
+      }
+    },
+    "102": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "left",
+        "image": [
+          "92",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save left.png"
+      }
+    },
+    "113": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "Create an orthographic FRONT THREE-QUARTER view of the same character in Picture 1, camera azimuth +45 degrees between front and right. Preserve the identical person, face, hairstyle, body proportions, neutral A-pose, garment construction, jacket length, belt, pockets, footwear, colors, materials, accessories, body scale, framing, camera elevation, plain background, and diffuse lighting. Full head and both feet visible. Do not redesign, add, remove, mirror, or beautify details."
+      },
+      "_meta": {
+        "title": "FRONT_3Q CAMERA INSTRUCTION"
+      }
+    },
+    "53": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "113",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Condition front_3q"
+      }
+    },
+    "63": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "53",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Reference front_3q"
+      }
+    },
+    "73": {
+      "class_type": "KSampler",
+      "inputs": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "model": [
+          "43",
+          0
+        ],
+        "positive": [
+          "63",
+          0
+        ],
+        "negative": [
+          "46",
+          0
+        ],
+        "latent_image": [
+          "44",
+          0
+        ],
+        "seed": [
+          "3",
+          0
+        ],
+        "steps": [
+          "8",
+          0
+        ],
+        "cfg": [
+          "9",
+          0
+        ],
+        "denoise": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Generate front_3q"
+      }
+    },
+    "83": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "73",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Decode front_3q"
+      }
+    },
+    "93": {
+      "class_type": "TurnaroundNormalize",
+      "inputs": {
+        "image": [
+          "83",
+          0
+        ],
+        "width": [
+          "4",
+          0
+        ],
+        "height": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Normalize front_3q"
+      }
+    },
+    "103": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "front_3q",
+        "image": [
+          "93",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save front_3q.png"
+      }
+    },
+    "114": {
+      "class_type": "PrimitiveStringMultiline",
+      "inputs": {
+        "value": "Create an orthographic BACK THREE-QUARTER view of the same character in Picture 1, camera azimuth +135 degrees between right and back. Preserve the identical person, hairstyle, body proportions, neutral A-pose, garment construction, jacket length, belt, pockets, footwear, colors, materials, accessories, body scale, framing, camera elevation, plain background, and diffuse lighting. Infer only physically necessary rear surfaces. Full head and both feet visible. Do not redesign, add, remove, mirror, or beautify details."
+      },
+      "_meta": {
+        "title": "BACK_3Q CAMERA INSTRUCTION"
+      }
+    },
+    "54": {
+      "class_type": "TextEncodeQwenImageEditPlus",
+      "inputs": {
+        "prompt": [
+          "114",
+          0
+        ],
+        "clip": [
+          "20",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ],
+        "image1": [
+          "200",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Condition back_3q"
+      }
+    },
+    "64": {
+      "class_type": "FluxKontextMultiReferenceLatentMethod",
+      "inputs": {
+        "reference_latents_method": "index_timestep_zero",
+        "conditioning": [
+          "54",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Reference back_3q"
+      }
+    },
+    "74": {
+      "class_type": "KSampler",
+      "inputs": {
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "model": [
+          "43",
+          0
+        ],
+        "positive": [
+          "64",
+          0
+        ],
+        "negative": [
+          "46",
+          0
+        ],
+        "latent_image": [
+          "44",
+          0
+        ],
+        "seed": [
+          "3",
+          0
+        ],
+        "steps": [
+          "8",
+          0
+        ],
+        "cfg": [
+          "9",
+          0
+        ],
+        "denoise": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Generate back_3q"
+      }
+    },
+    "84": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "74",
+          0
+        ],
+        "vae": [
+          "21",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Decode back_3q"
+      }
+    },
+    "94": {
+      "class_type": "TurnaroundNormalize",
+      "inputs": {
+        "image": [
+          "84",
+          0
+        ],
+        "width": [
+          "4",
+          0
+        ],
+        "height": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Normalize back_3q"
+      }
+    },
+    "104": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "back_3q",
+        "image": [
+          "94",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save back_3q.png"
+      }
+    },
+    "120": {
+      "class_type": "TurnaroundContactSheet",
+      "inputs": {
+        "front": [
+          "200",
+          0
+        ],
+        "right": [
+          "90",
+          0
+        ],
+        "back": [
+          "91",
+          0
+        ],
+        "left": [
+          "92",
+          0
+        ],
+        "front_3q": [
+          "93",
+          0
+        ],
+        "back_3q": [
+          "94",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "FRONT | FRONT 3/4 | RIGHT / BACK | BACK 3/4 | LEFT"
+      }
+    },
+    "121": {
+      "class_type": "TurnaroundSaveImage",
+      "inputs": {
+        "view_name": "turnaround_sheet",
+        "image": [
+          "120",
+          0
+        ],
+        "character_name": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Save turnaround_sheet.png"
+      }
+    },
+    "200": {
+      "class_type": "TurnaroundLoadImage",
+      "inputs": {
+        "character_name": [
+          "10",
+          0
+        ],
+        "view_name": "canonical"
+      },
+      "_meta": {
+        "title": "Load saved canonical.png"
+      }
+    }
+  }
+}

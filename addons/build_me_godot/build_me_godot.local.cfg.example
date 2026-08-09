@@ -1,0 +1,11 @@
+; Copy this file to the project root as `build_me_godot.local.cfg`, or write
+; it with Save for this project in the addon dock. The target is gitignored.
+; Resolution: command line > environment > local file > editor settings > defaults.
+
+[local_models]
+
+comfyui_url="http://127.0.0.1:8188"
+comfyui_root=""
+blender_path="blender"
+reconstruction_command=""
+animation_asset=""

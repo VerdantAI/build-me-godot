@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "workflow_id": "qwen_character_canonical_2512",
+  "workflow_file": "canonical_only_api.json",
+  "capability": "canonical_generation",
+  "helper": {
+    "id": "character_turnaround_output",
+    "version": 1,
+    "node_classes": [
+      "TurnaroundNormalize",
+      "TurnaroundSaveImage"
+    ]
+  },
+  "required_node_classes": [
+    "CLIPLoader",
+    "CLIPTextEncode",
+    "ConditioningZeroOut",
+    "EmptySD3LatentImage",
+    "KSampler",
+    "LoraLoaderModelOnly",
+    "ModelSamplingAuraFlow",
+    "PrimitiveFloat",
+    "PrimitiveInt",
+    "PrimitiveString",
+    "PrimitiveStringMultiline",
+    "TurnaroundNormalize",
+    "TurnaroundSaveImage",
+    "UNETLoader",
+    "VAEDecode",
+    "VAELoader"
+  ],
+  "model_artifacts": [
+    {
+      "loader": "CLIPLoader",
+      "input": "clip_name",
+      "value": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "VAELoader",
+      "input": "vae_name",
+      "value": "qwen_image_vae.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "UNETLoader",
+      "input": "unet_name",
+      "value": "qwen_image_2512_fp8_e4m3fn.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "LoraLoaderModelOnly",
+      "input": "lora_name",
+      "value": "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+      "repository": "Wuli-art/Qwen-Image-2512-Turbo-LoRA-2-Steps",
+      "weight_license": "Apache-2.0"
+    }
+  ],
+  "recommended_memory": {
+    "vram_gib": 8,
+    "system_ram_gib": 32,
+    "execution": "normal_vram_staged"
+  },
+  "outputs": ["canonical.png", "front.png"]
+}

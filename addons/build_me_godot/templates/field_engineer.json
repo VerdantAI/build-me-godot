@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "character_id": "field_engineer",
+  "display_name": "Field Engineer",
+  "prompt": "Full-body game character reference of a practical field engineer and surveyor, sturdy work boots, durable work trousers, canvas work jacket, utility belt, subtle near-future sustainable equipment, functional realistic clothing construction, neutral A-pose, arms away from body, feet shoulder-width apart, neutral expression, complete body visible, centered, orthographic character-development reference, uniform diffuse lighting, plain neutral background.",
+  "negative_prompt": "cropped body, crossed limbs, action pose, dramatic perspective, props obscuring body, uneven lighting",
+  "seed": 0,
+  "pose_contract": "neutral_a_pose_30deg_v1",
+  "workflow": {
+    "editor": "res://addons/build_me_godot/workflows/character_turnaround_open.json",
+    "canonical": "res://addons/build_me_godot/workflows/canonical_only_api.json",
+    "multiview": "res://addons/build_me_godot/workflows/multiview_only_api.json"
+  },
+  "image": {
+    "width": 768,
+    "height": 1024
+  },
+  "reconstruction": {
+    "provider": "external",
+    "command": ""
+  },
+  "blender": {
+    "height_m": 1.78,
+    "triangle_target": 25000
+  },
+  "artifacts": {},
+  "licenses": []
+}
