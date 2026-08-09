@@ -1,0 +1,8 @@
+[
+  {"name":"ready","expected":"ready","checks":[{"id":"provider.ready","capability":"canonical_generation","status":"pass","importance":"required","summary":"Ready","remediation_ids":[]}]},
+  {"name":"partial","expected":"not_ready","checks":[{"id":"provider.partial","capability":"multiview_generation","status":"unknown","importance":"required","summary":"Not configured","remediation_ids":[]},{"id":"provider.optional","capability":"last_mile_refinement","status":"warning","importance":"optional","summary":"Optional","remediation_ids":[]}]},
+  {"name":"incompatible","expected":"not_ready","checks":[{"id":"provider.incompatible","capability":"blender_humanoid_build","status":"fail","importance":"required","summary":"Unsupported version","remediation_ids":[]}]},
+  {"name":"unreachable","expected":"not_ready","checks":[{"id":"provider.unreachable","capability":"canonical_generation","status":"fail","importance":"required","summary":"Service unreachable","remediation_ids":[]}]},
+  {"name":"malformed","expected":"not_ready","checks":[{"id":"provider.malformed","capability":"canonical_generation","status":"unknown","importance":"required","summary":"Response malformed","remediation_ids":[]}]},
+  {"name":"optional_only","expected":"ready","checks":[{"id":"provider.optional","capability":"last_mile_refinement","status":"warning","importance":"optional","summary":"Optional dependency absent","remediation_ids":[]}]}
+]

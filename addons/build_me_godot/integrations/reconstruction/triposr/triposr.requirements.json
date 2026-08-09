@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "provider_id": "triposr",
+  "adapter_version": 1,
+  "code_repository": "VAST-AI-Research/TripoSR",
+  "code_commit": "107cefdc244c39106fa830359024f6a2f1c78871",
+  "code_license": "MIT",
+  "model_repository": "stabilityai/TripoSR",
+  "model_revision": "5b521936b01fbe1890f6f9baed0254ab6351c04a",
+  "weight_license": "MIT",
+  "commercial_use": true,
+  "input_contract": "one_or_more_independent_images",
+  "joint_multiview_conditioning": false,
+  "required_output": "0/mesh.glb",
+  "report": "generation.json"
+}

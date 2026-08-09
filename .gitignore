@@ -1,5 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
+/build_me_godot/
+build_me_godot.local.cfg
 
 # Godot-specific ignores
 *.translation

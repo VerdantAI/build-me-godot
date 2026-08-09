@@ -13,14 +13,45 @@ An opinionated AI workflow addon for Godot 4 that orchestrates [ComfyUI](https:/
 
 - Godot 4.x
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) running locally or on a reachable server.
-- [Blender](https://www.blender.org/) 3.x or 4.x installed and accessible from the command line.
+- [Blender](https://www.blender.org/) 4.2 or newer installed and accessible from the command line.
 
 ## Installation
 
 1. Copy the `addons/build_me_godot` folder into your Godot project's `addons/` directory.
 2. In the Godot editor, open **Project → Project Settings → Plugins** and enable **Build Me Godot**.
 
-Alternatively, install directly from the [Godot Asset Library](https://godotengine.org/asset-library/).
+Alternatively, install it from the [Godot Asset Store](https://store.godotengine.org/) when a release is available.
+
+Character manifests and generated work are stored under `res://build_me_godot/`. They are project data and are not removed or overwritten when the addon is updated. Model weights, Python environments, and Blender installations are external dependencies; enabling the addon never downloads or installs them.
+
+Machine configuration resolves from command-line overrides, `BUILD_ME_GODOT_*` environment variables, the gitignored project file `res://build_me_godot.local.cfg`, global Godot Editor Settings, then packaged defaults. Copy the packaged [`build_me_godot.local.cfg.example`](addons/build_me_godot/build_me_godot.local.cfg.example) to the project root or use **Save for this project** in the dock when headless tools need the same local model and executable paths as the editor.
+
+## Optional last-mile editing
+
+[Gator Model Studio](https://store.godotengine.org/asset/blackwater-gator-studios/gator-model-studio/) by Blackwater Gator Studios is a promising in-Godot last-mile option for interactively refining generated assets. Its modelling, UV, material, rigging, weight-painting, animation, collision, remeshing, and GLB tools complement Build Me Godot's orchestration and validation goals. It is optional, independently installed, and is not bundled with this addon. Blender remains the default automated processing path.
+
+See [Attributions](addons/build_me_godot/ATTRIBUTIONS.md) for the reviewed version and license information.
+
+The broader dependency review, including rejected model families, is recorded in [LICENSES.md](addons/build_me_godot/LICENSES.md).
+
+## Development
+
+Open this repository directly in Godot to exercise the addon. A character is represented by a portable, versioned JSON manifest under `res://build_me_godot/characters/<character_id>/character.json`. The same manifest is intended for Godot, Blender automation, command-line workers, and development agents.
+
+```bash
+godot --headless --editor --path . --quit
+godot --headless --path . --script res://tests/test_character_store.gd
+PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
+  addons/build_me_godot/integrations/comfyui/character_turnaround_output.py \
+  addons/build_me_godot/integrations/blender/build_humanoid_character.py \
+  addons/build_me_godot/integrations/blender/validate_deformation.py
+bash tests/test_environment_cli.sh
+bash tests/test_local_tools.sh
+bash tests/test_repository_separation.sh
+openspec validate add-installation-environment-utilities --strict
+```
+
+Store release copy and the manual publishing gate are maintained in [Store listing](addons/build_me_godot/docs/store-listing.md) and [Release checklist](addons/build_me_godot/docs/release-checklist.md).
 
 ## License
 

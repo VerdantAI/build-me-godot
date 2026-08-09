@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "builder_version": "1.0.0",
+  "minimum_blender_version": [4, 2, 0],
+  "pose_contract": "neutral_a_pose_30deg_v1",
+  "required_operators": [
+    "import_scene.gltf",
+    "object.parent_set",
+    "object.modifier_apply",
+    "object.vertex_group_limit_total",
+    "object.vertex_group_normalize_all",
+    "export_scene.gltf",
+    "wm.save_as_mainfile"
+  ],
+  "configuration": {
+    "required": ["character_id", "character_name", "source_mesh", "source_axis", "height_m", "landmarks", "triangle_target", "animation_asset", "animations", "views_dir", "output_dir", "pose_contract"],
+    "optional": ["anatomical_center_band", "arms", "depth_fit_limits_m", "fit_joint_depth_from_mesh", "landmark_provenance", "max_joint_mesh_distance_m"]
+  },
+  "outputs": {
+    "required_files": ["{character_id}.blend", "{character_id}.glb", "build_report.json"],
+    "report_required_fields": ["character_id", "config", "source_mesh", "blend", "glb", "ai_triangles", "proxy_triangles", "dimensions_m", "automatic_weights_completed", "maximum_vertex_influences", "joint_mesh_distance_m", "skeleton_bones", "animations", "animations_embedded", "manual_cleanup_required"]
+  }
+}
