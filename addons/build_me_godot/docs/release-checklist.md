@@ -26,6 +26,7 @@ git diff --check
 - Confirm Build Me Godot entries appear in global Editor Settings, **Save for me** updates them, and **Save for this project** writes the gitignored local file.
 - Confirm environment and CLI overrides take precedence, every field reports its effective source, and a headless check reads the local file without `EditorInterface`.
 - Exercise a clean project and a configured project without changing external dependencies.
+- Exercise the companion example project at https://github.com/VerdantAI/godot-addons-example-project as a normal consuming project before release.
 
 ## Store media gate
 
@@ -33,4 +34,5 @@ git diff --check
 - Capture capability-grouped environment results and the redacted technical report.
 - Capture saved character files and a ComfyUI workflow refinement view without exposing local paths or credentials.
 - Capture a generated turnaround and Blender/Godot result only when its asset license permits redistribution.
+- Prefer consumer-project screenshots from `godot-addons-example-project`; do not include generated characters, rigs, or model outputs whose licenses are not cleared for redistribution.
 - Review screenshots at Store thumbnail and full-size presentation before publishing.

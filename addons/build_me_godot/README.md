@@ -26,6 +26,12 @@ The addon stores character manifests and generated work under `res://build_me_go
 
 Machine configuration resolves from CLI overrides, `BUILD_ME_GODOT_*` environment variables, `res://build_me_godot.local.cfg`, global Editor Settings, then packaged defaults. The local file is gitignored and readable headlessly. Copy [the example](build_me_godot.local.cfg.example) to the project root or create it with **Save for this project** in the dock; **Save for me** writes global editor defaults.
 
+## Example project
+
+For a runnable consumer-project setup, use the companion [godot-addons-example-project](https://github.com/VerdantAI/godot-addons-example-project). It is separate from the Asset Store addon package and is the right place for sample scenes, rig placeholders, character manifests, and end-to-end manual workflow checks.
+
+The addon package remains self-contained under `addons/build_me_godot/`. Project-owned data belongs under each game's `res://build_me_godot/`.
+
 ## Character workflow
 
 Build Me Godot is driven from the target Godot project. Open the dock, create or select a character, confirm the two rigged mesh inputs, enter character metadata and prompts, then queue a local ComfyUI reference run. Runs are stored as sequential `v1`, `v2`, and later versions in `res://build_me_godot/characters/<character_id>/character.json`.

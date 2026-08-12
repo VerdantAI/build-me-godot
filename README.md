@@ -34,6 +34,22 @@ Machine configuration resolves from command-line overrides, `BUILD_ME_GODOT_*` e
 
 The plugin can run with only `addons/build_me_godot/` installed in a Godot project, plus user-configured external tools such as ComfyUI and Blender. The top-level `build_me_godot/` and `utils/` folders support this repository's local asset-production workflow.
 
+## Example project
+
+Use the companion [godot-addons-example-project](https://github.com/VerdantAI/godot-addons-example-project) to exercise Build Me Godot as a normal consuming project. It is the preferred place for runnable scenes, sample rig placeholders, sample character manifests, and end-to-end manual workflow checks.
+
+The example project is intentionally separate from this addon repository. Do not copy this repository's top-level `utils/` or local `build_me_godot/` workflow data into games; install only `addons/build_me_godot/` and keep project-owned character data under that game's `res://build_me_godot/`.
+
+For local addon development, symlink this working copy into the example project's `addons/` folder:
+
+```bash
+cd /home/buddha/verdant/godot-addons-example-project
+mkdir -p addons
+ln -s /home/buddha/verdant/build-me-godot/addons/build_me_godot addons/build_me_godot
+```
+
+Keep that symlink out of release packages and normal user installs. The symlink is for developers who want edits in this repo to be active immediately in the example project; Store testing should still verify the packaged addon copy.
+
 ## Godot-first character workflow
 
 Open the Build Me Godot dock inside the target Godot project. The addon records project context, two rigged mesh slots, character metadata, positive/negative prompts, generation settings, and later outputs in `res://build_me_godot/characters/<character_id>/character.json`.

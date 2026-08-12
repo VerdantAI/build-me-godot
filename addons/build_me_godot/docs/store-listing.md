@@ -24,6 +24,8 @@ Build Me Godot is a local-first Godot 4 editor addon for repeatable AI-assisted 
 
 The addon does not bundle model weights, Blender, ComfyUI, reconstruction providers, animation libraries, or Gator Model Studio. Enabling it does not download packages, contact hosted inference services, or modify external installations.
 
+Runnable example project: https://github.com/VerdantAI/godot-addons-example-project. The example is a separate consumer project, not part of the addon package.
+
 ### Important limitation
 
 Generated reconstruction geometry is an immutable reference/proxy. Automated decimation, fitting, and weights do not create production-ready deformation topology; artists must inspect and refine topology, weights, equipment, materials, and animations before shipping.

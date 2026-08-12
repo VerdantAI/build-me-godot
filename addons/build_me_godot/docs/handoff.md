@@ -11,6 +11,25 @@ landmarks, production topology, and runtime scenes.
 Do not copy reusable pipeline code into a game repository. Install this addon in
 that Godot project and keep artist data under `res://build_me_godot/`.
 
+Use the companion example project for consumer-project validation:
+https://github.com/VerdantAI/godot-addons-example-project
+
+The example project is intentionally outside the addon package. Put runnable
+scenes, sample rig placeholders, sample manifests, and end-to-end manual workflow
+fixtures there instead of inside this distributable addon folder.
+
+During local development, install the addon into that example project with a
+symlink so edits here are active there immediately:
+
+```sh
+cd /home/buddha/verdant/godot-addons-example-project
+mkdir -p addons
+ln -s /home/buddha/verdant/build-me-godot/addons/build_me_godot addons/build_me_godot
+```
+
+Do not treat that symlink as the Store package. Release validation still needs a
+normal copied/exported addon install.
+
 ## Current capabilities
 
 - Save and load versioned character prompts and seeds.
@@ -41,6 +60,7 @@ editor defaults. Headless runs never require `EditorInterface`.
 4. Use an exact action ID from `plan` for any supported mutation; model and
    package installation remain explicit manual work.
 5. Run every automated and manual gate in `release-checklist.md` before a Store release.
+6. Use `godot-addons-example-project` for consumer-project smoke tests and screenshots.
 
 ## Next independent milestones
 
