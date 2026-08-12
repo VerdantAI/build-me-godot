@@ -87,6 +87,8 @@ class Context:
     ollama_models_dir: Path
     ollama_models: list[str]
     json_output: bool
+    assume_yes: bool
+    non_interactive: bool
     checks: list[Check] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
     missing_models: list[dict[str, str]] = field(default_factory=list)
@@ -254,6 +256,8 @@ def build_context(args: argparse.Namespace) -> Context:
         ollama_models_dir=ollama_models_dir,
         ollama_models=ollama_models,
         json_output=bool(args.json),
+        assume_yes=bool(args.yes),
+        non_interactive=bool(args.non_interactive),
     )
 
 
@@ -369,11 +373,56 @@ def write_config(ctx: Context) -> Path:
     return ctx.config_path
 
 
+def action_detail_lines(action: Action) -> list[str]:
+    details = action.details
+    if action.id == "write.local.config":
+        return [f"Write local setup config: {details.get('target', '')}"]
+    if action.id == "install.comfyui.helper":
+        return [
+            f"Copy: {details.get('source', '')}",
+            f"Into: {details.get('target', '')}",
+            "Restart ComfyUI after installation so the helper nodes are loaded.",
+        ]
+    if action.id == "download.models":
+        models = details.get("models", [])
+        lines = [f"Download {len(models)} model file(s) into: {details.get('directory', '')}"]
+        lines.extend(f"- {row.get('value', '')}" for row in models)
+        return lines
+    if action.id == "move.models":
+        staged = details.get("staged_ready", [])
+        lines = [f"Move {len(staged)} staged model file(s) into ComfyUI model directories."]
+        lines.extend(f"- {row.get('staged_path', '')} -> {row.get('target_dir', '')}" for row in staged)
+        return lines
+    if action.id.startswith("pull.ollama."):
+        return [f"Run: ollama pull {details.get('model', action.id.removeprefix('pull.ollama.'))}"]
+    return [action.summary]
+
+
+def confirm_action(ctx: Context, action: Action) -> None:
+    if not action.mutates or ctx.assume_yes:
+        return
+    if ctx.json_output or ctx.non_interactive or not sys.stdin.isatty():
+        raise SystemExit(f"Action {action.id} requires confirmation. Rerun with --yes after explicit approval.")
+
+    print("\nAbout to apply action:")
+    print(f"  {action.id}: {action.summary}")
+    for line in action_detail_lines(action):
+        print(f"  {line}")
+    print("\nHelp: run `doctor` to list actions, use `--yes` for approved automation, or press Enter to cancel.")
+    answer = input("Proceed? [y/N] ").strip().lower()
+    if answer not in {"y", "yes"}:
+        raise SystemExit("Cancelled.")
+
+
 def apply_action(ctx: Context, action_id: str) -> None:
     run_checks(ctx)
     actions = {action.id: action for action in ctx.actions}
     if action_id not in actions:
         raise SystemExit(f"Unknown or unavailable action: {action_id}")
+    action = actions[action_id]
+    if not action.ready:
+        raise SystemExit(f"Action is not ready: {action_id}")
+    confirm_action(ctx, action)
 
     def emit(message: str) -> None:
         if ctx.json_output:
@@ -467,7 +516,9 @@ def build_parser() -> argparse.ArgumentParser:
   check --json              Read-only diagnostics; exits 0 only when required checks pass.
   plan --json               Read-only diagnostics plus remediation action IDs.
   doctor                    Human-readable alias for plan.
-  apply <action_id> --json  Run one explicit action and report changed paths.
+  apply <action_id>         Explain one explicit action, ask, then apply it.
+  apply <action_id> --yes --json
+                            Run an approved action and report changed paths.
 
 Mutating actions are never run by check, plan, or doctor. Use apply only after
 the user has approved the specific action ID shown in the plan output.
@@ -482,7 +533,8 @@ the user has approved the specific action ID shown in the plan output.
     parser.add_argument("--model-download-dir")
     parser.add_argument("--ollama-model", action="append")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--non-interactive", action="store_true", help="Accepted for compatibility; commands are non-interactive by default.")
+    parser.add_argument("--yes", action="store_true", help="Apply the selected action without prompting after explicit approval.")
+    parser.add_argument("--non-interactive", action="store_true", help="Do not prompt; mutating apply actions require --yes.")
     return parser
 
 
@@ -497,6 +549,8 @@ def main(argv: list[str]) -> int:
         apply_action(ctx, args.action_id)
     elif args.command == "write-config":
         run_checks(ctx)
+        actions = {action.id: action for action in ctx.actions}
+        confirm_action(ctx, actions["write.local.config"])
         path = write_config(ctx)
         if not args.json:
             print(f"Wrote {path}")
