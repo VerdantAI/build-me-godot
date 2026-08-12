@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "workflow_id": "qwen_blender_reference_set_ui",
+  "workflow_file": "qwen_blender_reference_set_ui.json",
+  "capability": "ui_tuned_blender_reference_set",
+  "stage": "ui_first",
+  "headless_status": "deferred_until_ui_tuned",
+  "required_node_classes": [
+    "CFGNorm",
+    "CLIPLoader",
+    "CLIPTextEncode",
+    "ConditioningZeroOut",
+    "EmptySD3LatentImage",
+    "FluxKontextMultiReferenceLatentMethod",
+    "KSampler",
+    "LoraLoaderModelOnly",
+    "ModelSamplingAuraFlow",
+    "PrimitiveFloat",
+    "PrimitiveInt",
+    "PrimitiveString",
+    "PrimitiveStringMultiline",
+    "TextEncodeQwenImageEditPlus",
+    "TurnaroundContactSheet",
+    "TurnaroundLoadImage",
+    "TurnaroundNormalize",
+    "TurnaroundSaveImage",
+    "UNETLoader",
+    "VAEDecode",
+    "VAEEncode",
+    "VAELoader"
+  ],
+  "model_artifacts": [
+    {
+      "loader": "CLIPLoader",
+      "input": "clip_name",
+      "value": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "VAELoader",
+      "input": "vae_name",
+      "value": "qwen_image_vae.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "UNETLoader",
+      "input": "unet_name",
+      "value": "qwen_image_2512_fp8_e4m3fn.safetensors",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "LoraLoaderModelOnly",
+      "input": "lora_name",
+      "value": "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+      "repository": "Wuli-art/Qwen-Image-2512-Turbo-LoRA-2-Steps",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "UNETLoader",
+      "input": "unet_name",
+      "value": "qwen_image_edit_2511_fp8mixed.safetensors",
+      "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+      "weight_license": "Apache-2.0"
+    },
+    {
+      "loader": "LoraLoaderModelOnly",
+      "input": "lora_name",
+      "value": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "repository": "lightx2v/Qwen-Image-Edit-2511-Lightning",
+      "weight_license": "Apache-2.0"
+    }
+  ],
+  "manual_inputs": [
+    "positive character prompt",
+    "negative prompt / preservation constraints",
+    "seed",
+    "character output name"
+  ],
+  "outputs": [
+    "canonical.png",
+    "front.png",
+    "right.png",
+    "back.png",
+    "left.png",
+    "front_3q.png",
+    "back_3q.png",
+    "turnaround_sheet.png"
+  ]
+}
