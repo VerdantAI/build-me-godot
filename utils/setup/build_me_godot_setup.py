@@ -348,7 +348,8 @@ def run_checks(ctx: Context) -> None:
     else:
         add_check(ctx, Check("ollama.models", "skip", "Ollama models not requested", required=False))
 
-    add_action(ctx, Action("write.local.config", "Write reusable gitignored local setup config.", True, details={"target": str(ctx.config_path)}))
+    if not ctx.config_path.exists():
+        add_action(ctx, Action("write.local.config", "Write reusable gitignored local setup config.", True, details={"target": str(ctx.config_path)}))
     add_action(ctx, Action("open.comfy", "Print the configured ComfyUI URL for opening in a browser.", False, details={"url": ctx.comfyui_url}))
 
 
@@ -543,6 +544,10 @@ def apply_action(ctx: Context, action_id: str) -> None:
     reset_results(ctx)
     run_checks(ctx)
     actions = {action.id: action for action in ctx.actions}
+    if action_id == "write.local.config" and action_id not in actions:
+        action = Action("write.local.config", "Rewrite reusable gitignored local setup config.", True, details={"target": str(ctx.config_path)})
+        actions[action_id] = action
+        ctx.actions.append(action)
     if action_id not in actions:
         raise SystemExit(f"Unknown or unavailable action: {action_id}")
     action = actions[action_id]
@@ -684,7 +689,8 @@ def main(argv: list[str]) -> int:
     elif args.command == "write-config":
         run_checks(ctx)
         actions = {action.id: action for action in ctx.actions}
-        confirm_action(ctx, actions["write.local.config"])
+        action = actions.get("write.local.config", Action("write.local.config", "Rewrite reusable gitignored local setup config.", True, details={"target": str(ctx.config_path)}))
+        confirm_action(ctx, action)
         path = write_config(ctx)
         if not args.json:
             print(f"Wrote {path}")
