@@ -42,7 +42,7 @@ Run the local requirement helper from this repository when preparing a Linux wor
 utils/check-local-requirements.sh
 ```
 
-With no command, the helper checks the machine, lists ready setup actions, and asks before applying each one. It also prints detail/help commands and an agent handoff command.
+With no command, the helper checks the machine, lists ready setup actions, and asks before applying each one. It also prints detail/help commands and a prominent `AGENT HANDOFF` command block.
 
 The helper can also write a reusable, gitignored local config:
 

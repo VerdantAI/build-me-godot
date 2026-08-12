@@ -523,7 +523,9 @@ def print_setup_guidance(ctx: Context) -> None:
     print("\nSetup assistant:")
     print("- Details: ./utils/check-local-requirements.sh doctor")
     print("- Help: ./utils/check-local-requirements.sh --help")
-    print("- Agent use: ask an agent to run `./utils/check-local-requirements.sh plan --json`, then approve specific `apply <action_id> --yes --json` commands.")
+    print("\nAGENT HANDOFF:")
+    print("  Ask an agent to run: ./utils/check-local-requirements.sh plan --json")
+    print("  Then approve specific: ./utils/check-local-requirements.sh apply <action_id> --yes --json")
 
     ready_actions = [action for action in ctx.actions if action.mutates and action.ready]
     blocked_actions = [action for action in ctx.actions if action.mutates and not action.ready]

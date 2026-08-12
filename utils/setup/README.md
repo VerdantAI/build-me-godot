@@ -5,7 +5,8 @@
 agents:
 
 - `setup` is the default command. It checks the machine, prints detail/help
-  commands, lists ready actions, and asks before applying each action.
+  commands, shows a prominent `AGENT HANDOFF` command block, lists ready
+  actions, and asks before applying each action.
 - `check` is read-only and reports current state.
 - `plan` is read-only and reports available remediation action IDs.
 - `doctor` is a human-readable alias for `plan`.
