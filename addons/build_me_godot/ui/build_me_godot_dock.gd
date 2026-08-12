@@ -34,6 +34,9 @@ var last_environment_report := {}
 var configuration_status: Label
 var pending_generation_character_id := ""
 var pending_generation_version := ""
+var run_select: OptionButton
+var reference_preview: TextureRect
+var run_details: RichTextLabel
 
 
 func _ready() -> void:
@@ -145,6 +148,42 @@ func _build_ui() -> void:
 	canonical_button.pressed.connect(_queue_canonical)
 	add_child(canonical_button)
 
+	add_child(HSeparator.new())
+	var review_title := Label.new()
+	review_title.text = "Reference review"
+	add_child(review_title)
+	run_select = OptionButton.new()
+	run_select.tooltip_text = "Generated reference versions for the selected character"
+	run_select.item_selected.connect(_on_run_selected)
+	add_child(run_select)
+	reference_preview = TextureRect.new()
+	reference_preview.custom_minimum_size = Vector2(320, 180)
+	reference_preview.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	reference_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	add_child(reference_preview)
+	run_details = RichTextLabel.new()
+	run_details.fit_content = true
+	run_details.custom_minimum_size.y = 120
+	add_child(run_details)
+	var review_buttons := HBoxContainer.new()
+	var approve_button := Button.new()
+	approve_button.text = "Approve version"
+	approve_button.pressed.connect(_approve_selected_run)
+	review_buttons.add_child(approve_button)
+	var rerun_button := Button.new()
+	rerun_button.text = "Rerun version"
+	rerun_button.pressed.connect(_rerun_selected_run)
+	review_buttons.add_child(rerun_button)
+	var continue_button := Button.new()
+	continue_button.text = "Continue pipeline"
+	continue_button.pressed.connect(_continue_selected_run)
+	review_buttons.add_child(continue_button)
+	var open_comfy_button := Button.new()
+	open_comfy_button.text = "Open in ComfyUI"
+	open_comfy_button.pressed.connect(_open_selected_run_in_comfyui)
+	review_buttons.add_child(open_comfy_button)
+	add_child(review_buttons)
+
 	dependency_status = RichTextLabel.new()
 	dependency_status.fit_content = true
 	dependency_status.custom_minimum_size.y = 55
@@ -215,6 +254,7 @@ func _on_character_selected(index: int) -> void:
 	primary_rigged_mesh.text = str(rigged_meshes.get("primary", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH))
 	secondary_rigged_mesh.text = str(rigged_meshes.get("secondary", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH))
 	seed.value = int(manifest.get("seed", 0))
+	_refresh_review(manifest)
 	_set_status("Loaded %s" % result.path)
 
 
@@ -229,6 +269,7 @@ func _new_character() -> void:
 	primary_rigged_mesh.text = CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH
 	secondary_rigged_mesh.text = CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH
 	seed.value = 0
+	_refresh_review({})
 	_set_status("Enter a character ID and prompt, then save.")
 
 
@@ -245,6 +286,7 @@ func _save_character() -> Dictionary:
 		return result
 	character_id.text = result.manifest.character_id
 	_refresh_characters(result.manifest.character_id)
+	_refresh_review(result.manifest)
 	_set_status("Saved %s" % result.path)
 	return result
 
@@ -278,6 +320,155 @@ func _create_field_engineer() -> void:
 	var selected := character_select.selected
 	_on_character_selected(selected)
 	_set_status("Created %s" % result.path)
+
+
+func _refresh_review(manifest: Dictionary) -> void:
+	run_select.clear()
+	reference_preview.texture = null
+	run_details.clear()
+	if manifest.is_empty():
+		run_select.add_item("No character selected")
+		return
+	var generation: Dictionary = manifest.get("generation", {})
+	var selected_version := str(generation.get("selected_version", ""))
+	var runs: Array = generation.get("runs", [])
+	if runs.is_empty():
+		run_select.add_item("No reference runs yet")
+		run_details.text = "Queue a reference workflow to create v1."
+		return
+	for run in runs:
+		if not run is Dictionary:
+			continue
+		var version := str(run.get("version", ""))
+		var label := "%s - %s" % [version, str(run.get("status", "draft"))]
+		if version == selected_version:
+			label += " (approved)"
+		run_select.add_item(label)
+		run_select.set_item_metadata(run_select.item_count - 1, version)
+		if version == selected_version:
+			run_select.select(run_select.item_count - 1)
+	_render_selected_run(manifest)
+
+
+func _on_run_selected(_index: int) -> void:
+	var loaded := store.load_character(character_id.text)
+	if loaded.ok:
+		_render_selected_run(loaded.manifest)
+
+
+func _render_selected_run(manifest: Dictionary) -> void:
+	var run := _selected_run(manifest)
+	reference_preview.texture = null
+	run_details.clear()
+	if run.is_empty():
+		return
+	var outputs: Dictionary = run.get("outputs", {})
+	_load_reference_preview(outputs)
+	var lines := PackedStringArray([
+		"Version: %s" % str(run.get("version", "")),
+		"Status: %s" % str(run.get("status", "")),
+		"Prompt: %s" % str(run.get("positive_prompt", "")),
+		"Negative: %s" % str(run.get("negative_prompt", "")),
+		"Seed: %d" % int(run.get("seed", 0)),
+		"Prompt ID: %s" % str(run.get("prompt_id", ""))
+	])
+	for key in outputs:
+		lines.append("%s: %s" % [str(key), str(outputs[key])])
+	run_details.text = "\n".join(lines)
+
+
+func _selected_run(manifest: Dictionary) -> Dictionary:
+	if run_select.item_count == 0:
+		return {}
+	var selected_index := run_select.selected
+	if selected_index < 0:
+		return {}
+	var selected_version := str(run_select.get_item_metadata(selected_index))
+	var generation: Dictionary = manifest.get("generation", {})
+	for run in generation.get("runs", []):
+		if run is Dictionary and str(run.get("version", "")) == selected_version:
+			return run
+	return {}
+
+
+func _selected_run_version() -> String:
+	if run_select.item_count == 0 or run_select.selected < 0:
+		return ""
+	return str(run_select.get_item_metadata(run_select.selected))
+
+
+func _load_reference_preview(outputs: Dictionary) -> void:
+	for key in ["turnaround_sheet", "contact_sheet", "front", "canonical"]:
+		if not outputs.has(key):
+			continue
+		var path := str(outputs[key])
+		if path.is_empty() or not FileAccess.file_exists(path):
+			continue
+		var image := Image.new()
+		if image.load(path) != OK:
+			continue
+		reference_preview.texture = ImageTexture.create_from_image(image)
+		return
+
+
+func _approve_selected_run() -> void:
+	var version := _selected_run_version()
+	if version.is_empty():
+		_set_status("Select a generated version before approving.", true)
+		return
+	var approved := store.approve_generation_version(character_id.text, version)
+	if not approved.ok:
+		_set_status(approved.error, true)
+		return
+	_refresh_review(approved.manifest)
+	_set_status("Approved %s." % version)
+
+
+func _rerun_selected_run() -> void:
+	var loaded := store.load_character(character_id.text)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var run := _selected_run(loaded.manifest)
+	if run.is_empty():
+		_set_status("Select a generated version before rerunning.", true)
+		return
+	prompt.text = str(run.get("positive_prompt", ""))
+	negative_prompt.text = str(run.get("negative_prompt", ""))
+	seed.value = int(run.get("seed", 0))
+	_queue_canonical()
+
+
+func _continue_selected_run() -> void:
+	var version := _selected_run_version()
+	if version.is_empty():
+		_set_status("Select an approved version before continuing.", true)
+		return
+	var continued := store.continue_pipeline(character_id.text, {
+		"version": version,
+		"warnings_acknowledged": true
+	})
+	if not continued.ok:
+		_set_status(continued.error, true)
+		return
+	_refresh_review(continued.manifest)
+	_set_status("Pipeline enabled for %s." % version)
+
+
+func _open_selected_run_in_comfyui() -> void:
+	var loaded := store.load_character(character_id.text)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var run := _selected_run(loaded.manifest)
+	var prompt_id := str(run.get("prompt_id", ""))
+	var url := comfyui_url.text.strip_edges()
+	if url.is_empty():
+		_set_status("ComfyUI URL is required.", true)
+		return
+	if not prompt_id.is_empty():
+		url = url.trim_suffix("/") + "/history/" + prompt_id.uri_encode()
+	OS.shell_open(url)
 
 
 func _load_configuration() -> void:
@@ -408,6 +599,7 @@ func _queue_canonical() -> void:
 	var run_record: Dictionary = runs[runs.size() - 1]
 	pending_generation_character_id = str(run.manifest.character_id)
 	pending_generation_version = str(run_record.version)
+	_refresh_review(run.manifest)
 	comfy_client.configure(comfyui_url.text)
 	var error: Error = comfy_client.queue_prompt(workflow)
 	if error != OK:
@@ -423,11 +615,13 @@ func _queue_canonical() -> void:
 
 func _on_prompt_queued(prompt_id: String) -> void:
 	if not pending_generation_character_id.is_empty() and not pending_generation_version.is_empty():
-		store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+		var queued := store.update_generation_run(pending_generation_character_id, pending_generation_version, {
 			"status": "queued",
 			"prompt_id": prompt_id,
 			"queued_at": Time.get_datetime_string_from_system(true)
 		})
+		if queued.ok:
+			_refresh_review(queued.manifest)
 	comfy_client.request_history(prompt_id)
 	_set_status("ComfyUI queued %s prompt %s" % [pending_generation_version, prompt_id])
 
@@ -436,23 +630,47 @@ func _on_history_received(prompt_id: String, history: Dictionary) -> void:
 	if pending_generation_character_id.is_empty() or pending_generation_version.is_empty():
 		return
 	var prompt_history: Dictionary = history.get(prompt_id, {})
-	var updates := {
-		"status": "completed" if prompt_history.has("outputs") else "queued",
-		"history": prompt_history,
-		"completed_at": Time.get_datetime_string_from_system(true) if prompt_history.has("outputs") else ""
-	}
-	store.update_generation_run(pending_generation_character_id, pending_generation_version, updates)
 	if prompt_history.has("outputs"):
-		_set_status("ComfyUI completed %s." % pending_generation_version)
+		var configured_comfyui_root := comfyui_root.text.strip_edges()
+		var comfy_output_root := configured_comfyui_root.path_join("output") if not configured_comfyui_root.is_empty() else ""
+		var completed := store.complete_generation_run(
+			pending_generation_character_id,
+			pending_generation_version,
+			prompt_history,
+			comfy_output_root,
+			"res://addons/build_me_godot/workflows/canonical_only_api.requirements.json"
+		)
+		if completed.ok:
+			_refresh_review(completed.manifest)
+			_set_status("ComfyUI completed %s and copied outputs into the project." % pending_generation_version)
+		else:
+			var failed := store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+				"status": "failed",
+				"history": prompt_history,
+				"error": completed.error,
+				"completed_at": Time.get_datetime_string_from_system(true)
+			})
+			if failed.ok:
+				_refresh_review(failed.manifest)
+			_set_status(completed.error, true)
+		return
+	var updated := store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+		"status": "queued",
+		"history": prompt_history
+	})
+	if updated.ok:
+		_refresh_review(updated.manifest)
 
 
 func _on_comfy_error(message: String) -> void:
 	if not pending_generation_character_id.is_empty() and not pending_generation_version.is_empty():
-		store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+		var failed := store.update_generation_run(pending_generation_character_id, pending_generation_version, {
 			"status": "failed",
 			"error": message,
 			"completed_at": Time.get_datetime_string_from_system(true)
 		})
+		if failed.ok:
+			_refresh_review(failed.manifest)
 	_set_status(message, true)
 
 

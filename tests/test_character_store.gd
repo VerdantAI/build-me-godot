@@ -80,13 +80,36 @@ func _init() -> void:
 	if not _check(queued_v2.manifest.generation.runs[1].prompt_id == "prompt-test-2", "prompt id was not recorded on run"): return
 	if not _check(queued_v2.manifest.generation.runs[1].status == "queued", "run status was not updated to queued"): return
 	if not _check(queued_v2.manifest.generation.runs[0].get("prompt_id", "") == "", "run update changed another version"): return
-	var completed_v2 := store.update_generation_run("draft_character", "v2", {
-		"status": "completed",
-		"completed_at": "2026-08-12T00:01:00",
-		"outputs": {"contact_sheet": "res://build_me_godot/characters/draft_character/references/v2/contact_sheet.png"}
-	})
+	var fake_comfy_output_root := ProjectSettings.globalize_path(test_root.path_join("fake_comfy/output"))
+	var fake_comfy_character_dir := fake_comfy_output_root.path_join("character_turnaround/draft_character")
+	DirAccess.make_dir_recursive_absolute(fake_comfy_character_dir)
+	var fake_front := FileAccess.open(fake_comfy_character_dir.path_join("front.png"), FileAccess.WRITE)
+	fake_front.store_string("fake image bytes")
+	fake_front.close()
+	var completed_v2 := store.complete_generation_run(
+		"draft_character",
+		"v2",
+		{
+			"outputs": {
+				"save_front": {
+					"images": [{
+						"filename": "front.png",
+						"subfolder": "character_turnaround/draft_character",
+						"type": "output"
+					}]
+				}
+			}
+		},
+		fake_comfy_output_root,
+		"res://addons/build_me_godot/workflows/canonical_only_api.requirements.json"
+	)
 	if not _check(completed_v2.ok, completed_v2.get("error", "run completion update failed")): return
-	if not _check(completed_v2.manifest.generation.runs[1].outputs.contact_sheet.ends_with("contact_sheet.png"), "run outputs were not recorded"): return
+	if not _check(completed_v2.manifest.generation.runs[1].status == "completed", "run status was not updated to completed"): return
+	if not _check(completed_v2.manifest.generation.runs[1].outputs.front.ends_with("references/v2/front.png"), "copied run output path was not recorded"): return
+	if not _check(DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(test_root.path_join("characters/draft_character/references/v2"))), "reference output folder was not present"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/references/v2/front.png")), "completed output was not copied into the project"): return
+	if not _check(completed_v2.manifest.generation.runs[1].model_provenance.workflow_id == "qwen_character_canonical_2512", "workflow provenance was not recorded"): return
+	if not _check(completed_v2.changed_paths.has(test_root.path_join("characters/draft_character/references/v2/front.png")), "changed output path was not reported"): return
 	var missing_run_update := store.update_generation_run("draft_character", "v99", {"status": "failed"})
 	if not _check(not missing_run_update.ok, "missing run update should fail"): return
 	var approved := store.approve_generation_version("draft_character", "v2")
@@ -100,6 +123,15 @@ func _init() -> void:
 	if not _check(resaved_draft.manifest.stage == "reference_approved", "draft resave regressed stage"): return
 	var missing_version := store.approve_generation_version("draft_character", "v99")
 	if not _check(not missing_version.ok, "missing version approval should fail"): return
+	var blocked_continue := store.continue_pipeline("draft_character", {"version": "v2"})
+	if not _check(not blocked_continue.ok, "continuation should require warning acknowledgement"): return
+	var continued := store.continue_pipeline("draft_character", {"version": "v2", "warnings_acknowledged": true})
+	if not _check(continued.ok, continued.get("error", "continuation failed")): return
+	if not _check(continued.manifest.stage == "pipeline_enabled", "pipeline stage was not enabled"): return
+	if not _check(continued.manifest.pipeline.approved_version == "v2", "pipeline approved version was not recorded"): return
+	if not _check(continued.manifest.pipeline.readiness_warnings.size() == 1, "pipeline readiness warnings were not recorded"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/blender/v2/reference_inputs.json")), "Blender reference input was not written"): return
+	if not _check(continued.changed_paths.has(test_root.path_join("characters/draft_character/blender/v2/reference_inputs.json")), "Blender reference input changed path was not reported"): return
 	var final_assets := store.register_final_assets("draft_character", {
 		"character_scene": "res://build_me_godot/characters/draft_character/draft_character.tscn",
 		"animations": ["res://build_me_godot/characters/draft_character/animations/idle.res"],

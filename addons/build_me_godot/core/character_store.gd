@@ -65,6 +65,12 @@ func save_draft(values: Dictionary) -> Dictionary:
 		draft["character_id"] = character_name
 	if str(draft.get("display_name", "")).strip_edges().is_empty():
 		draft["display_name"] = character_name
+	var existing := load_character(str(draft.character_id))
+	if existing.ok:
+		if not draft.has("project_context") and existing.manifest.get("project_context", {}) is Dictionary:
+			draft["project_context"] = existing.manifest.project_context
+		if not draft.has("rigged_meshes") and existing.manifest.get("rigged_meshes", {}) is Dictionary:
+			draft["rigged_meshes"] = existing.manifest.rigged_meshes
 	draft["project_context"] = _project_context(draft)
 	draft["rigged_meshes"] = _rigged_meshes_from_values(draft)
 	return save_character(draft)
@@ -119,7 +125,8 @@ func create_generation_run(character_id: String, values: Dictionary) -> Dictiona
 		"seed": int(values.get("seed", manifest.get("seed", 0))),
 		"queued_at": str(values.get("queued_at", "")),
 		"completed_at": str(values.get("completed_at", "")),
-		"outputs": values.get("outputs", {})
+		"outputs": values.get("outputs", {}),
+		"model_provenance": values.get("model_provenance", {})
 	}
 	var folder_error := _ensure_run_folders(str(manifest.character_id), version)
 	if folder_error != OK:
@@ -174,6 +181,50 @@ func approve_generation_version(character_id: String, version: String) -> Dictio
 	return save_character(manifest)
 
 
+func complete_generation_run(character_id: String, version: String, prompt_history: Dictionary, comfyui_output_root: String, requirements_path := "") -> Dictionary:
+	if comfyui_output_root.strip_edges().is_empty():
+		return {"ok": false, "error": "ComfyUI output root is required to copy completed outputs."}
+	var loaded := load_character(character_id)
+	if not loaded.ok:
+		return loaded
+	var manifest: Dictionary = loaded.manifest
+	var images := _collect_comfy_images(prompt_history)
+	if images.is_empty():
+		return {"ok": false, "error": "ComfyUI history did not include image outputs for %s." % version}
+	var references_dir := characters_root.path_join(str(manifest.character_id)).path_join("references").path_join(version)
+	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(references_dir))
+	if error != OK:
+		return {"ok": false, "error": "Could not create %s: %s" % [references_dir, error_string(error)]}
+	var copied_outputs := {}
+	var changed_paths := PackedStringArray()
+	for image in images:
+		var filename := str(image.get("filename", "")).get_file()
+		if filename.is_empty():
+			continue
+		var source := _join_filesystem_path(comfyui_output_root, str(image.get("subfolder", "")), filename)
+		var view_name := filename.get_basename()
+		var destination := references_dir.path_join(filename)
+		var copy_error := _copy_file(source, ProjectSettings.globalize_path(destination))
+		if copy_error != OK:
+			return {"ok": false, "error": "Could not copy %s to %s: %s" % [source, destination, error_string(copy_error)]}
+		copied_outputs[view_name] = destination
+		changed_paths.append(destination)
+	var updates := {
+		"status": "completed",
+		"history": prompt_history,
+		"outputs": copied_outputs,
+		"completed_at": Time.get_datetime_string_from_system(true)
+	}
+	var provenance := _workflow_provenance(requirements_path)
+	if not provenance.is_empty():
+		updates["model_provenance"] = provenance
+	var saved := update_generation_run(character_id, version, updates)
+	if saved.ok:
+		changed_paths.append(saved.path)
+		saved["changed_paths"] = changed_paths
+	return saved
+
+
 func register_final_assets(character_id: String, values: Dictionary) -> Dictionary:
 	var loaded := load_character(character_id)
 	if not loaded.ok:
@@ -212,6 +263,9 @@ func continue_pipeline(character_id: String, values: Dictionary = {}) -> Diction
 	var rigged_meshes := _rigged_meshes_from_values(manifest)
 	if str(rigged_meshes.primary).strip_edges().is_empty() or str(rigged_meshes.secondary).strip_edges().is_empty():
 		return {"ok": false, "error": "Both rigged mesh slots are required before continuing."}
+	var readiness_warnings := _pipeline_readiness_warnings(manifest)
+	if not readiness_warnings.is_empty() and not bool(values.get("warnings_acknowledged", false)):
+		return {"ok": false, "error": "Acknowledge next-stage warnings before continuing: %s" % "; ".join(readiness_warnings)}
 	var blender_directory := characters_root.path_join(str(manifest.character_id)).path_join("blender").path_join(selected_version)
 	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(blender_directory))
 	if error != OK:
@@ -239,6 +293,7 @@ func continue_pipeline(character_id: String, values: Dictionary = {}) -> Diction
 		"enabled_at": Time.get_datetime_string_from_system(true),
 		"approved_version": selected_version,
 		"warnings_acknowledged": bool(values.get("warnings_acknowledged", false)),
+		"readiness_warnings": readiness_warnings,
 		"blender_reference_input": reference_input_path
 	}
 	var saved := save_character(manifest)
@@ -423,6 +478,67 @@ func _find_generation_run(manifest: Dictionary, version: String) -> Dictionary:
 		if run is Dictionary and str(run.get("version", "")) == version:
 			return run
 	return {}
+
+
+func _collect_comfy_images(prompt_history: Dictionary) -> Array[Dictionary]:
+	var images: Array[Dictionary] = []
+	var outputs: Dictionary = prompt_history.get("outputs", {})
+	for node_id in outputs:
+		var node_output = outputs[node_id]
+		if not node_output is Dictionary:
+			continue
+		for image in node_output.get("images", []):
+			if image is Dictionary:
+				images.append(image)
+	return images
+
+
+func _workflow_provenance(requirements_path: String) -> Dictionary:
+	if requirements_path.strip_edges().is_empty():
+		return {}
+	var file := FileAccess.open(requirements_path, FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not parsed is Dictionary:
+		return {}
+	return {
+		"workflow_id": str(parsed.get("workflow_id", "")),
+		"workflow_file": str(parsed.get("workflow_file", "")),
+		"capability": str(parsed.get("capability", "")),
+		"model_artifacts": parsed.get("model_artifacts", []),
+		"helper": parsed.get("helper", {}),
+		"recommended_memory": parsed.get("recommended_memory", {})
+	}
+
+
+func _pipeline_readiness_warnings(manifest: Dictionary) -> PackedStringArray:
+	var warnings := PackedStringArray()
+	var reconstruction: Dictionary = manifest.get("reconstruction", {})
+	if str(reconstruction.get("command", "")).strip_edges().is_empty():
+		warnings.append("Reconstruction command is not configured.")
+	var project_context: Dictionary = manifest.get("project_context", {})
+	if str(project_context.get("animation_library", "")).strip_edges().is_empty():
+		warnings.append("Animation library is not configured.")
+	return warnings
+
+
+func _join_filesystem_path(root: String, subfolder: String, filename: String) -> String:
+	var path := root.trim_suffix("/")
+	for part in subfolder.replace("\\", "/").split("/", false):
+		path = path.path_join(part)
+	return path.path_join(filename)
+
+
+func _copy_file(source: String, destination: String) -> Error:
+	var input := FileAccess.open(source, FileAccess.READ)
+	if input == null:
+		return FileAccess.get_open_error()
+	var output := FileAccess.open(destination, FileAccess.WRITE)
+	if output == null:
+		return FileAccess.get_open_error()
+	output.store_buffer(input.get_buffer(input.get_length()))
+	return OK
 
 
 func _ensure_run_folders(character_id: String, version: String) -> Error:

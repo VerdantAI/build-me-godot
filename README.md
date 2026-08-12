@@ -110,7 +110,10 @@ Open this repository directly in Godot to exercise the addon. A character is rep
 godot --headless --editor --path . --quit
 godot --headless --path . --script res://tests/test_character_store.gd
 bash tests/test_character_cli.sh
+bash tests/test_comfyui_client.sh
+godot --headless --editor --path . --script res://tests/test_build_me_godot_dock_smoke.gd --quit
 PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
+  tests/mock_comfyui_server.py \
   addons/build_me_godot/integrations/comfyui/character_turnaround_output.py \
   addons/build_me_godot/integrations/blender/build_humanoid_character.py \
   addons/build_me_godot/integrations/blender/validate_deformation.py
