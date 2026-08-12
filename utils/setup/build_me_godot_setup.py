@@ -272,6 +272,13 @@ def add_action(ctx: Context, action: Action) -> None:
         ctx.actions.append(action)
 
 
+def reset_results(ctx: Context) -> None:
+    ctx.checks.clear()
+    ctx.actions.clear()
+    ctx.missing_models.clear()
+    ctx.missing_nodes.clear()
+
+
 def run_checks(ctx: Context) -> None:
     add_check(ctx, Check("project.file", "ok" if (PROJECT_ROOT / "project.godot").exists() else "missing", "Godot project file"))
     add_check(ctx, Check("addon.source", "ok" if (PROJECT_ROOT / "addons" / "build_me_godot").is_dir() else "missing", "Build Me Godot addon source"))
@@ -414,16 +421,7 @@ def confirm_action(ctx: Context, action: Action) -> None:
         raise SystemExit("Cancelled.")
 
 
-def apply_action(ctx: Context, action_id: str) -> None:
-    run_checks(ctx)
-    actions = {action.id: action for action in ctx.actions}
-    if action_id not in actions:
-        raise SystemExit(f"Unknown or unavailable action: {action_id}")
-    action = actions[action_id]
-    if not action.ready:
-        raise SystemExit(f"Action is not ready: {action_id}")
-    confirm_action(ctx, action)
-
+def execute_action(ctx: Context, action_id: str) -> None:
     def emit(message: str) -> None:
         if ctx.json_output:
             return
@@ -480,6 +478,19 @@ def apply_action(ctx: Context, action_id: str) -> None:
         raise SystemExit(f"Action is not implemented: {action_id}")
 
 
+def apply_action(ctx: Context, action_id: str) -> None:
+    reset_results(ctx)
+    run_checks(ctx)
+    actions = {action.id: action for action in ctx.actions}
+    if action_id not in actions:
+        raise SystemExit(f"Unknown or unavailable action: {action_id}")
+    action = actions[action_id]
+    if not action.ready:
+        raise SystemExit(f"Action is not ready: {action_id}")
+    confirm_action(ctx, action)
+    execute_action(ctx, action_id)
+
+
 def report(ctx: Context) -> dict[str, Any]:
     ready = all(check.status == "ok" for check in ctx.checks if check.required)
     return {
@@ -508,11 +519,71 @@ def print_human(ctx: Context, include_actions: bool) -> None:
             print(f"curl --location --fail --continue-at - --output './{row['value']}' '{row['url']}'")
 
 
+def print_setup_guidance(ctx: Context) -> None:
+    print("\nSetup assistant:")
+    print("- Details: ./utils/check-local-requirements.sh doctor")
+    print("- Help: ./utils/check-local-requirements.sh --help")
+    print("- Agent use: ask an agent to run `./utils/check-local-requirements.sh plan --json`, then approve specific `apply <action_id> --yes --json` commands.")
+
+    ready_actions = [action for action in ctx.actions if action.mutates and action.ready]
+    blocked_actions = [action for action in ctx.actions if action.mutates and not action.ready]
+    if ready_actions:
+        print("\nReady setup actions:")
+        for action in ready_actions:
+            print(f"- {action.id}: {action.summary}")
+    if blocked_actions:
+        print("\nBlocked setup actions:")
+        for action in blocked_actions:
+            print(f"- {action.id}: {action.summary}")
+
+
+def run_guided_setup(ctx: Context) -> None:
+    run_checks(ctx)
+    if ctx.json_output:
+        return
+    print_setup_guidance(ctx)
+    if ctx.non_interactive or not sys.stdin.isatty():
+        return
+
+    ready_actions = [action for action in ctx.actions if action.mutates and action.ready]
+    if not ready_actions:
+        return
+    answer = input("\nReview and apply ready setup actions now? [y/N] ").strip().lower()
+    if answer not in {"y", "yes"}:
+        return
+
+    applied: set[str] = set()
+    while True:
+        progress = False
+        for action in list(ctx.actions):
+            if not action.mutates or not action.ready or action.id in applied:
+                continue
+            try:
+                confirm_action(ctx, action)
+            except SystemExit as exc:
+                if str(exc) != "Cancelled.":
+                    raise
+                print(f"Skipped {action.id}.")
+                applied.add(action.id)
+                progress = True
+                break
+            execute_action(ctx, action.id)
+            applied.add(action.id)
+            progress = True
+            reset_results(ctx)
+            run_checks(ctx)
+            print_setup_guidance(ctx)
+            break
+        if not progress:
+            break
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build Me Godot local setup assistant.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""Agent-safe flow:
+        epilog="""Common flows:
+  setup                     Default guided setup for humans; asks before each action.
   check --json              Read-only diagnostics; exits 0 only when required checks pass.
   plan --json               Read-only diagnostics plus remediation action IDs.
   doctor                    Human-readable alias for plan.
@@ -524,7 +595,7 @@ Mutating actions are never run by check, plan, or doctor. Use apply only after
 the user has approved the specific action ID shown in the plan output.
 """,
     )
-    parser.add_argument("command", nargs="?", default="check", choices=["check", "plan", "doctor", "apply", "write-config", "open-comfy"], help="Command to run.")
+    parser.add_argument("command", nargs="?", default="setup", choices=["setup", "check", "plan", "doctor", "apply", "write-config", "open-comfy"], help="Command to run.")
     parser.add_argument("action_id", nargs="?", help="Action ID for apply.")
     parser.add_argument("--config")
     parser.add_argument("--comfyui-url")
@@ -558,12 +629,15 @@ def main(argv: list[str]) -> int:
         if not args.json:
             print(ctx.comfyui_url)
     else:
-        run_checks(ctx)
-        if not args.json:
-            if args.command in {"plan", "doctor"}:
-                print_human(ctx, include_actions=True)
-            else:
-                print_human(ctx, include_actions=False)
+        if args.command == "setup":
+            run_guided_setup(ctx)
+        else:
+            run_checks(ctx)
+            if not args.json:
+                if args.command in {"plan", "doctor"}:
+                    print_human(ctx, include_actions=True)
+                elif args.command == "check":
+                    print_human(ctx, include_actions=False)
 
     data = report(ctx)
     if args.json:

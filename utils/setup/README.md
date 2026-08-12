@@ -4,6 +4,8 @@
 `../check-local-requirements.sh`. It is designed for both humans and coding
 agents:
 
+- `setup` is the default command. It checks the machine, prints detail/help
+  commands, lists ready actions, and asks before applying each action.
 - `check` is read-only and reports current state.
 - `plan` is read-only and reports available remediation action IDs.
 - `doctor` is a human-readable alias for `plan`.
@@ -17,8 +19,8 @@ agents:
 Recommended agent flow:
 
 ```bash
-utils/check-local-requirements.sh check --json
 utils/check-local-requirements.sh plan --json
+utils/check-local-requirements.sh check --json
 utils/check-local-requirements.sh apply write.local.config --yes --json
 utils/check-local-requirements.sh apply install.comfyui.helper --yes --json
 utils/check-local-requirements.sh apply download.models --yes --json
@@ -26,9 +28,9 @@ utils/check-local-requirements.sh apply move.models --yes --json
 ```
 
 Do not run `apply` actions unless the user has approved the specific action ID.
-Without `--yes`, interactive `apply` commands show the planned file operation
-and ask before proceeding. Model downloads are staged first; moving them into
-ComfyUI is a separate action.
+Without `--yes`, interactive `setup` and `apply` commands show the planned file
+operation and ask before proceeding. Model downloads are staged first; moving
+them into ComfyUI is a separate action.
 
 Machine-readable reports include:
 

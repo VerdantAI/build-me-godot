@@ -39,10 +39,10 @@ The plugin can run with only `addons/build_me_godot/` installed in a Godot proje
 Run the local requirement helper from this repository when preparing a Linux workstation:
 
 ```bash
-utils/check-local-requirements.sh check \
-  --comfyui-root "$HOME/src/ComfyUI" \
-  --ollama-model llama3.1:8b
+utils/check-local-requirements.sh
 ```
+
+With no command, the helper checks the machine, lists ready setup actions, and asks before applying each one. It also prints detail/help commands and an agent handoff command.
 
 The helper can also write a reusable, gitignored local config:
 
@@ -50,11 +50,12 @@ The helper can also write a reusable, gitignored local config:
 utils/check-local-requirements.sh apply write.local.config
 ```
 
-Use [utils/check-local-requirements.conf.example](utils/check-local-requirements.conf.example) as the checked-in template. The generated `utils/check-local-requirements.local.conf` records ComfyUI URL/root, model staging directory, Blender executable, and Ollama host/model paths for later runs.
+Use [utils/check-local-requirements.conf.example](utils/check-local-requirements.conf.example) as the checked-in template. The generated `utils/check-local-requirements.local.conf` records ComfyUI URL/root, model staging directory, Blender executable, and Ollama host/model paths for later runs. Pass overrides such as `--comfyui-root "$HOME/src/ComfyUI"` or `--ollama-model llama3.1:8b` when needed.
 
-The helper is a Python setup app with a shell wrapper. Use `check` for read-only diagnostics, `plan` to list available remediation actions, and `apply <action_id>` for explicit mutations:
+The helper is a Python setup app with a shell wrapper. Use `check` for read-only diagnostics, `doctor` for human-readable details, `plan --json` to hand setup to an agent, and `apply <action_id>` for explicit mutations:
 
 ```bash
+utils/check-local-requirements.sh doctor
 utils/check-local-requirements.sh check --json
 utils/check-local-requirements.sh plan --json
 utils/check-local-requirements.sh apply install.comfyui.helper
