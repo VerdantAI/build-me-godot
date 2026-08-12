@@ -3,16 +3,34 @@
 ### Requirement: Godot Character Drafts
 
 The addon SHALL provide a Godot editor workflow for creating and editing a
-character draft with metadata, positive prompt, negative prompt, and generation
-settings before any ComfyUI run is queued.
+character draft with project-context metadata, replaceable rigged mesh inputs,
+positive prompt, negative prompt, and generation settings before any ComfyUI
+run is queued.
 
 #### Scenario: Create a draft
 
 - **GIVEN** the user opens the Build Me Godot editor dock
-- **WHEN** the user enters a valid character ID, display name, metadata,
-  positive prompt, and negative prompt
+- **WHEN** the addon can infer project context from the open Godot project
+- **THEN** the dock displays inferred project metadata and default workspace
+  values before generation.
+
+#### Scenario: Replace project rigged meshes
+
+- **GIVEN** the user opens the Build Me Godot editor dock
+- **WHEN** the pipeline requires two rigged mesh inputs
+- **THEN** the dock displays both current rigged mesh assignments
+- **AND** the user can replace each assignment with a project-specific rigged
+  mesh before continuing.
+
+#### Scenario: Create a draft
+
+- **GIVEN** the user opens the Build Me Godot editor dock
+- **WHEN** the user enters a valid character ID or character name, display
+  name, required metadata not inferred from the project, positive prompt, and
+  negative prompt
 - **THEN** the addon writes or updates the character manifest under
   `res://build_me_godot/characters/<character_id>/character.json`
+- **AND** the prompts are saved for later reuse
 - **AND** the addon does not write into `addons/build_me_godot/`
 - **AND** no ComfyUI, Blender, or model-download action runs until explicitly
   requested.
@@ -20,8 +38,8 @@ settings before any ComfyUI run is queued.
 #### Scenario: Reject invalid draft metadata
 
 - **GIVEN** the user is editing a character draft
-- **WHEN** required metadata is missing or the character ID contains invalid
-  path characters
+- **WHEN** required metadata is missing, a required rigged mesh slot is
+  unassigned, or the character ID contains invalid path characters
 - **THEN** the dock shows actionable validation messages
 - **AND** generation controls remain disabled.
 
@@ -29,25 +47,33 @@ settings before any ComfyUI run is queued.
 
 The addon SHALL queue the reviewed ComfyUI reference workflow only after an
 explicit user action and SHALL record each run with prompt, settings,
-provenance, status, and output paths.
+provenance, sequential version tag, status, and output paths.
 
 #### Scenario: Queue a reference run
 
 - **GIVEN** the selected character draft is valid
 - **AND** reference-generation readiness checks pass
 - **WHEN** the user starts generation
-- **THEN** the addon records a pending run in the manifest before queueing
+- **THEN** the addon assigns the next sequential version tag
+- **AND** the addon records a pending run in the manifest before queueing
   ComfyUI
 - **AND** the run includes workflow ID, workflow version, prompts, seed or seed
-  policy, queue time, and status.
+  policy, queue time, version tag, and status.
 
 #### Scenario: Complete a reference run
 
 - **GIVEN** a queued ComfyUI run completes successfully
 - **WHEN** the addon processes the ComfyUI history/output response
 - **THEN** generated outputs are copied into
-  `res://build_me_godot/characters/<character_id>/references/<run_id>/`
+  `res://build_me_godot/characters/<character_id>/references/<version>/`
 - **AND** the manifest records project-local output paths for the run.
+
+#### Scenario: Assign sequential version tags
+
+- **GIVEN** a character already has runs tagged `v1` and `v2`
+- **WHEN** the user starts another generation
+- **THEN** the addon tags the new run as `v3`
+- **AND** no previous run output or prompt is overwritten.
 
 #### Scenario: Preserve failed run attribution
 
@@ -73,21 +99,22 @@ pipeline continuation.
 
 - **GIVEN** a completed run exists
 - **WHEN** the user edits the prompt and starts another generation
-- **THEN** the addon creates a new run ID
+- **THEN** the addon creates a new run ID and next sequential version tag
 - **AND** previous run outputs and provenance remain available for review.
 
 #### Scenario: Approve a reference run
 
 - **GIVEN** a completed run has required reference outputs
 - **WHEN** the user approves that run
-- **THEN** the manifest records the run as the selected reference set
+- **THEN** the manifest records the run version as the selected reference set
 - **AND** the character stage advances to reference approved or equivalent.
 
 ### Requirement: Explicit Pipeline Continuation
 
 The addon SHALL require a separate user approval before continuing from
 approved reference images into Blender preparation, rigging, validation, or
-Godot import work.
+Godot import work, and SHALL produce a project-local playable character scene
+with animations and secondary assets when the downstream pipeline completes.
 
 #### Scenario: Disable continuation before approval
 
@@ -95,6 +122,14 @@ Godot import work.
 - **WHEN** the user views pipeline controls
 - **THEN** continuation controls are disabled
 - **AND** the dock explains which reference approval requirement is missing.
+
+#### Scenario: Disable continuation before rigged meshes are assigned
+
+- **GIVEN** a completed run is approved
+- **AND** a required rigged mesh slot is unassigned
+- **WHEN** the user views pipeline controls
+- **THEN** continuation controls are disabled
+- **AND** the dock explains which rigged mesh assignment is missing.
 
 #### Scenario: Continue after approval
 
@@ -104,6 +139,15 @@ Godot import work.
 - **THEN** the addon writes Blender reference input metadata under the
   character folder
 - **AND** the manifest records the stage transition and changed paths.
+
+#### Scenario: Register final character assets
+
+- **GIVEN** the downstream Blender/Godot build completes successfully
+- **WHEN** the addon imports the result into the project
+- **THEN** a final character scene is available under the character folder
+- **AND** available animations are referenced from the manifest
+- **AND** secondary assets such as helmets, swords, clipboards, or other props
+  are available as project-local scenes or resources.
 
 ### Requirement: Agent-Readable Workflow State
 
@@ -116,7 +160,9 @@ commands suitable for coding agents.
 - **GIVEN** a character draft exists
 - **WHEN** an agent runs the headless inspect command
 - **THEN** stdout contains parseable JSON with schema version, character ID,
-  stage, run list, selected run ID, output paths, and available actions
+  stage, rigged mesh assignments, run list, selected version, output paths,
+  final scene path, animation paths, secondary asset paths, and available
+  actions
 - **AND** progress, logs, and human prose are not emitted to stdout.
 
 #### Scenario: Apply approved transition as an agent

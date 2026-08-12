@@ -6,6 +6,13 @@ rigging, but it should remain a reference asset. The Godot addon must own the
 workflow state: prompt, character metadata, output paths, selected images,
 approval state, and next pipeline stage.
 
+This is a Godot addon running inside a real project/game, not a standalone
+asset factory. The workflow should infer what it can from the current project:
+project name, configured output workspace, existing animation libraries,
+available rigged base meshes, style defaults, and any project-local settings.
+The user should only be asked for information the project cannot reliably
+provide, primarily character name and generation prompts.
+
 The addon is intended for Godot Asset Store distribution. Enabling it must not
 start downloads, mutate ComfyUI, install models, or run Blender. All expensive
 or mutating steps remain explicit user actions.
@@ -14,16 +21,22 @@ or mutating steps remain explicit user actions.
 
 **Goals**
 
-- Provide a Godot editor tool where a user enters character metadata,
-  positive/negative prompts, generation settings, and an output folder.
+- Provide a Godot editor tool that gathers project/context metadata from the
+  open project and asks the user for character name, positive/negative prompts,
+  and missing generation settings.
+- Present the two rigged meshes the pipeline needs when the addon opens, and
+  let the user replace them with project-specific meshes.
 - Queue the reviewed ComfyUI reference workflow using local configuration.
-- Track every generation attempt as a run with prompt/settings/provenance.
+- Track every generation attempt as a selectable sequential versioned run
+  (`v1`, `v2`, `v3`, ...), with prompt/settings/provenance.
 - Let the user review outputs in Godot, open ComfyUI for deeper review, edit
   prompts, and rerun without losing previous outputs.
 - Split or normalize an approved contact sheet into named reference images when
   needed for Blender reference planes.
 - Require an explicit approval/continue action before Blender reconstruction,
   modeling, rigging, validation, or Godot import continues.
+- Produce a final Godot scene containing the rigged character, its available
+  animations, and secondary assets generated or selected for the character.
 - Keep artist-created manifests and outputs under `res://build_me_godot/`.
 - Give agents deterministic files and commands to inspect run state and apply
   explicitly approved transitions.
@@ -40,27 +53,33 @@ or mutating steps remain explicit user actions.
 
 ## Workflow
 
-1. User opens the Build Me Godot dock and creates or selects a character draft.
-2. User enters required metadata:
-   - character ID / display name;
+1. User opens the Build Me Godot dock inside an existing Godot project.
+2. The dock discovers project context and displays the two rigged mesh slots
+   required by the pipeline, using defaults when available.
+3. User accepts or replaces those rigged meshes for the project.
+4. User creates or selects a character draft and enters missing required data:
+   - character name / display name;
    - role/archetype;
-   - body proportions or style notes;
    - positive prompt;
    - negative prompt;
    - optional seed and workflow settings.
-3. The dock runs readiness checks for the reference-generation capability.
-4. User starts a ComfyUI generation run.
-5. The addon records a pending run in the character manifest before queueing.
-6. The addon polls ComfyUI for completion and records produced images.
-7. User reviews the output:
+5. The dock saves prompts and context metadata for later use.
+6. The dock runs readiness checks for the reference-generation capability.
+7. User starts a ComfyUI generation run.
+8. The addon allocates the next sequential version tag (`v1`, then `v2`, etc.)
+   and records a pending run in the character manifest before queueing.
+9. The addon polls ComfyUI for completion and records produced images.
+10. User reviews the output:
    - in the Godot dock;
    - optionally via an “Open in ComfyUI” action;
    - with prompt/settings visible beside the image.
-8. User can duplicate/edit the prompt and rerun, creating a new run.
-9. User approves one run as the selected reference set.
-10. User explicitly enables continuation of the rest of the pipeline.
-11. The addon creates normalized reference inputs for Blender automation and
+11. User can duplicate/edit the prompt and rerun, creating the next version tag.
+12. User approves one version as the selected reference set.
+13. User explicitly enables continuation of the rest of the pipeline.
+14. The addon creates normalized reference inputs for Blender automation and
     advances the manifest stage.
+15. Once build/import is complete, the character, animations, and secondary
+    assets are available as project-local scenes/resources.
 
 ## Character Manifest Shape
 
@@ -73,16 +92,25 @@ or formalizes fields equivalent to:
   "character_id": "field_engineer",
   "display_name": "Field Engineer",
   "stage": "reference_review",
+  "project_context": {
+    "project_name": "Verdant Example Game",
+    "animation_library": "res://build_me_godot/animations/humanoid_core.tres"
+  },
+  "rigged_meshes": {
+    "primary": "res://build_me_godot/rigs/base_humanoid.glb",
+    "secondary": "res://build_me_godot/rigs/reference_proxy.glb"
+  },
   "metadata": {
     "role": "construction field engineer",
     "style": "realistic game character",
     "pose_contract": "neutral_a_pose_30deg_v1"
   },
   "generation": {
-    "selected_run_id": "run_20260812_154322",
+    "selected_version": "v1",
     "runs": [
       {
         "run_id": "run_20260812_154322",
+        "version": "v1",
         "workflow_id": "qwen_blender_reference_set_ui",
         "workflow_version": "1",
         "status": "complete",
@@ -100,6 +128,19 @@ or formalizes fields equivalent to:
         }
       }
     ]
+  },
+  "assets": {
+    "character_scene": "res://build_me_godot/characters/field_engineer/field_engineer.tscn",
+    "animations": [
+      "res://build_me_godot/characters/field_engineer/animations/idle.res"
+    ],
+    "secondary_assets": [
+      {
+        "asset_id": "hardhat",
+        "scene": "res://build_me_godot/characters/field_engineer/assets/hardhat.tscn",
+        "socket": "head"
+      }
+    ]
   }
 }
 ```
@@ -113,7 +154,14 @@ approved, and which stage can run next.
 - Character manifests live under
   `res://build_me_godot/characters/<character_id>/character.json`.
 - Generated references live under
-  `res://build_me_godot/characters/<character_id>/references/<run_id>/`.
+  `res://build_me_godot/characters/<character_id>/references/<version>/`.
+- Final character scenes live under
+  `res://build_me_godot/characters/<character_id>/<character_id>.tscn`.
+- Secondary assets live under
+  `res://build_me_godot/characters/<character_id>/assets/`.
+- Character-specific animation resources live under
+  `res://build_me_godot/characters/<character_id>/animations/` unless they
+  reference shared project animation libraries.
 - Blender intermediates and validation outputs live under the same character
   folder, not under `addons/build_me_godot/`.
 - Addon workflow templates and scripts remain under `addons/build_me_godot/`.
@@ -137,6 +185,7 @@ The “continue pipeline” button is disabled until:
 - a run is complete;
 - required reference outputs exist;
 - the user marks a run approved;
+- the required rigged mesh slots are assigned;
 - readiness checks for the next stage pass or warnings are acknowledged.
 
 ## Godot UI
@@ -144,6 +193,8 @@ The “continue pipeline” button is disabled until:
 The dock should provide:
 
 - character draft selector / create new;
+- project context summary collected from the current Godot project;
+- two rigged mesh slots with replace controls;
 - metadata fields;
 - positive and negative prompt editors;
 - seed/settings controls;
@@ -153,6 +204,8 @@ The dock should provide:
 - image review area for contact sheet and split views;
 - buttons for approve run, open in ComfyUI, export/copy run report, and
   continue pipeline.
+- final asset summary showing the generated character scene, animations, and
+  secondary assets once available.
 
 The UI must avoid writing to external installations. It can call ComfyUI
 through configured local endpoints and write project-local outputs.
@@ -166,6 +219,7 @@ Agents should be able to:
 - run a headless command to queue a generation only after explicit approval;
 - inspect run status and outputs in JSON;
 - apply an approved “continue pipeline” transition.
+- inspect final scene, animation, and secondary asset paths.
 
 Machine output must remain deterministic JSON with stable IDs and changed path
 lists. Prompt text is project data and may appear in project-local manifests,
@@ -183,17 +237,24 @@ chooses to include them.
   Queueing and polling must be asynchronous from the dock perspective.
 - A visually good reference does not guarantee production topology. The
   manifest stage names should reflect that image approval is not mesh approval.
+- Project-derived metadata can be wrong or incomplete. The UI should show what
+  it inferred and let users override rigged mesh inputs and critical metadata.
 
 ## Migration Plan
 
-1. Add manifest fields and helper APIs for character draft generation runs.
-2. Add Godot dock form and local persistence for metadata/prompts.
+1. Add manifest fields and helper APIs for project context, rigged mesh slots,
+   versioned character draft generation runs, final scenes, animations, and
+   secondary assets.
+2. Add Godot dock form and local persistence for project metadata, mesh slots,
+   character name, and prompts.
 3. Add ComfyUI queue/poll integration for the reviewed reference workflow.
 4. Add output copy/import into character reference folders.
 5. Add review/approve/rerun UI.
 6. Add explicit continue gate and prepare Blender reference inputs.
-7. Add headless/agent commands for draft, run status, approval, and continue.
-8. Add tests and documentation.
+7. Add final scene/animation/secondary-asset registration.
+8. Add headless/agent commands for draft, run status, approval, continue, and
+   final asset inspection.
+9. Add tests and documentation.
 
 ## Open Questions
 
@@ -204,3 +265,6 @@ chooses to include them.
   referenced by the manifest?
 - Should “Open in ComfyUI” link to the current server history entry, copied
   output folder, or both?
+- What are the exact semantics of the two rigged mesh slots in the first
+  implementation: production base plus fitting proxy, masculine/feminine bases,
+  or project-defined roles?
