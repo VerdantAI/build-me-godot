@@ -65,6 +65,8 @@ utils/check-local-requirements.sh apply move.models
 
 The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, pulls Ollama models, or writes config. Mutating `apply` commands explain the planned change and ask for confirmation by default; use `--yes` only after a specific action has already been approved for non-interactive or JSON automation.
 
+If the Build Me Godot helper file exists but ComfyUI has not loaded its node classes, the helper offers `refresh.comfyui.helper`; restart ComfyUI after running it.
+
 When declared workflow model files are missing, the helper prints a download review with the declared license, source repository, URL, staging path, and target ComfyUI directory, plus `curl` commands for the reviewed Apache-2.0 artifacts. `apply download.models` downloads files into the configured staging directory with a terminal progress bar, writes in-progress downloads to `.part` files, and removes partial downloads after cancellation or failure. `apply move.models` moves staged files into the correct ComfyUI `models/` subdirectory without overwriting existing files.
 
 ## Optional last-mile editing

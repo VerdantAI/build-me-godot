@@ -25,6 +25,12 @@ WORKFLOW_REQUIREMENTS = [
     PROJECT_ROOT / "addons" / "build_me_godot" / "workflows" / "multiview_only_api.requirements.json",
     PROJECT_ROOT / "build_me_godot" / "workflows" / "qwen_blender_reference_set_ui.requirements.json",
 ]
+HELPER_NODE_CLASSES = {
+    "TurnaroundContactSheet",
+    "TurnaroundLoadImage",
+    "TurnaroundNormalize",
+    "TurnaroundSaveImage",
+}
 
 
 MODEL_PATHS = {
@@ -301,8 +307,8 @@ def run_checks(ctx: Context) -> None:
         required=False,
     ))
 
-    if ctx.comfyui_root:
-        helper = ctx.comfyui_root / "custom_nodes" / "character_turnaround_output.py"
+    helper = ctx.comfyui_root / "custom_nodes" / "character_turnaround_output.py" if ctx.comfyui_root else None
+    if helper:
         if helper.exists():
             add_check(ctx, Check("comfyui.helper", "ok", "ComfyUI turnaround helper", details={"path": str(helper)}))
         else:
@@ -314,6 +320,18 @@ def run_checks(ctx: Context) -> None:
         missing_nodes = [node for node in load_required_nodes() if node not in object_info]
         ctx.missing_nodes = missing_nodes
         add_check(ctx, Check("comfyui.nodes", "ok" if not missing_nodes else "missing", "ComfyUI required workflow nodes", details={"missing": missing_nodes}))
+        if helper and helper.exists() and any(node in HELPER_NODE_CLASSES for node in missing_nodes):
+            add_action(ctx, Action(
+                "refresh.comfyui.helper",
+                "Refresh the Build Me Godot ComfyUI helper nodes, then restart ComfyUI.",
+                True,
+                details={
+                    "target": str(helper),
+                    "source": str(HELPER_SOURCE),
+                    "missing_node_classes": [node for node in missing_nodes if node in HELPER_NODE_CLASSES],
+                    "restart_required": True,
+                },
+            ))
     else:
         add_check(ctx, Check("comfyui.nodes", "skip", "ComfyUI node metadata unavailable", details=object_info))
 
@@ -439,6 +457,16 @@ def action_detail_lines(action: Action) -> list[str]:
             f"Into: {details.get('target', '')}",
             "Restart ComfyUI after installation so the helper nodes are loaded.",
         ]
+    if action.id == "refresh.comfyui.helper":
+        lines = [
+            f"Refresh: {details.get('source', '')}",
+            f"Into: {details.get('target', '')}",
+            "Restart ComfyUI after refresh so the helper nodes are loaded.",
+        ]
+        missing = details.get("missing_node_classes", [])
+        if missing:
+            lines.append(f"Missing helper classes: {', '.join(missing)}")
+        return lines
     if action.id == "download.models":
         models = details.get("models", [])
         lines = [f"Download {len(models)} model file(s) into: {details.get('directory', '')}"]
@@ -497,6 +525,16 @@ def execute_action(ctx: Context, action_id: str) -> None:
         shutil.copy2(HELPER_SOURCE, target)
         ctx.changed_paths.append(str(target))
         emit(f"Installed helper: {target}")
+        emit("Restart ComfyUI before rechecking nodes.")
+    elif action_id == "refresh.comfyui.helper":
+        if not ctx.comfyui_root:
+            raise SystemExit("ComfyUI root is required.")
+        target = ctx.comfyui_root / "custom_nodes" / "character_turnaround_output.py"
+        if not target.exists():
+            raise SystemExit(f"Helper is not installed yet: {target}")
+        shutil.copy2(HELPER_SOURCE, target)
+        ctx.changed_paths.append(str(target))
+        emit(f"Refreshed helper: {target}")
         emit("Restart ComfyUI before rechecking nodes.")
     elif action_id == "download.models":
         ctx.model_download_dir.mkdir(parents=True, exist_ok=True)
@@ -594,14 +632,18 @@ def print_human(ctx: Context, include_actions: bool) -> None:
 
 
 def print_review(ctx: Context) -> None:
-    helper_actions = [action for action in ctx.actions if action.id == "install.comfyui.helper"]
+    helper_actions = [action for action in ctx.actions if action.id in {"install.comfyui.helper", "refresh.comfyui.helper"}]
     if helper_actions or ctx.missing_nodes:
         print("\nCustom node review:")
     for action in helper_actions:
-        print("- Build Me Godot helper install:")
+        label = "Build Me Godot helper install" if action.id == "install.comfyui.helper" else "Build Me Godot helper refresh"
+        print(f"- {label}:")
         print(f"  source: {action.details.get('source', '')}")
         print(f"  target: {action.details.get('target', '')}")
         print("  restart required: yes")
+        missing = action.details.get("missing_node_classes", [])
+        if missing:
+            print(f"  missing helper classes: {', '.join(missing)}")
     if ctx.missing_nodes:
         print("- Missing workflow node classes:")
         for node in ctx.missing_nodes:

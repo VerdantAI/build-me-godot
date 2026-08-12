@@ -39,6 +39,9 @@ them into ComfyUI is a separate action. Terminal downloads show a progress bar;
 Human output includes review sections for missing ComfyUI custom node classes
 and model downloads. Model reviews include the declared license, source
 repository, download URL, staging path, and target ComfyUI model directory.
+If the Build Me Godot helper file exists but ComfyUI has not loaded its node
+classes, setup offers `refresh.comfyui.helper`; restart ComfyUI after running
+that action.
 
 Machine-readable reports include:
 
