@@ -26,6 +26,26 @@ Character manifests and generated work are stored under `res://build_me_godot/`.
 
 Machine configuration resolves from command-line overrides, `BUILD_ME_GODOT_*` environment variables, the gitignored project file `res://build_me_godot.local.cfg`, global Godot Editor Settings, then packaged defaults. Copy the packaged [`build_me_godot.local.cfg.example`](addons/build_me_godot/build_me_godot.local.cfg.example) to the project root or use **Save for this project** in the dock when headless tools need the same local model and executable paths as the editor.
 
+## Repository layout
+
+- `addons/build_me_godot/` is the distributable Godot plugin. Keep everything required by the Asset Store package self-contained there.
+- `build_me_godot/` is project-local data for this repository: artist workflows, Blender scenes, generated manifests, and outputs. It is not copied as part of the plugin package.
+- `utils/` is for repository-level Linux helper scripts that inspect or prepare the local workstation. These scripts are not part of the Godot addon and should not be copied into consuming games unless the user explicitly wants them.
+
+The plugin can run with only `addons/build_me_godot/` installed in a Godot project, plus user-configured external tools such as ComfyUI and Blender. The top-level `build_me_godot/` and `utils/` folders support this repository's local asset-production workflow.
+
+## Local setup utilities
+
+Run the local requirement helper from this repository when preparing a Linux workstation:
+
+```bash
+utils/check-local-requirements.sh \
+  --comfyui-root "$HOME/src/ComfyUI" \
+  --ollama-model llama3.1:8b
+```
+
+The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. It prints missing requirements and suggested commands, but it does not install packages, download model weights, modify ComfyUI, or change system configuration. Treat every suggested install or model-pull command as a separate user action.
+
 ## Optional last-mile editing
 
 [Gator Model Studio](https://store.godotengine.org/asset/blackwater-gator-studios/gator-model-studio/) by Blackwater Gator Studios is a promising in-Godot last-mile option for interactively refining generated assets. Its modelling, UV, material, rigging, weight-painting, animation, collision, remeshing, and GLB tools complement Build Me Godot's orchestration and validation goals. It is optional, independently installed, and is not bundled with this addon. Blender remains the default automated processing path.
