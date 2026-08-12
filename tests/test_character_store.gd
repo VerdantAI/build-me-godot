@@ -31,6 +31,85 @@ func _init() -> void:
 	if not _check(loaded.manifest.future_field.preserve, "unknown manifest fields were not preserved"): return
 	if not _check(loaded.manifest.display_name == "Test Character", "existing manifest fields were not preserved"): return
 	if not _check(store.list_characters() == PackedStringArray(["test_character"]), "character listing failed"): return
+	var draft := store.save_draft({
+		"character_id": "Draft Character",
+		"display_name": "Draft Character",
+		"metadata": {
+			"role": "test role",
+			"style": "test style",
+			"pose_contract": "neutral_a_pose_30deg_v1"
+		},
+		"prompt": "positive draft prompt",
+		"negative_prompt": "negative draft prompt",
+		"animation_asset": "res://animations/shared_library.glb",
+		"rigged_meshes": {
+			"primary": "res://characters/base_primary.glb",
+			"secondary": "res://characters/base_secondary.glb"
+		}
+	})
+	if not _check(draft.ok, draft.get("error", "draft save failed")): return
+	if not _check(draft.manifest.stage == "draft", "draft stage was not set"): return
+	if not _check(draft.manifest.project_context.workspace_root == test_root, "project context did not record workspace root"): return
+	if not _check(draft.manifest.project_context.animation_library == "res://animations/shared_library.glb", "project animation library was not recorded"): return
+	if not _check(draft.manifest.metadata.role == "test role", "metadata role did not round-trip"): return
+	if not _check(draft.manifest.metadata.style == "test style", "metadata style did not round-trip"): return
+	if not _check(draft.manifest.rigged_meshes.primary == "res://characters/base_primary.glb", "primary rigged mesh did not round-trip"): return
+	if not _check(draft.manifest.rigged_meshes.secondary == "res://characters/base_secondary.glb", "secondary rigged mesh did not round-trip"): return
+	if not _check(draft.manifest.generation.runs.is_empty(), "draft should not create generation runs"): return
+	var validation_errors := store.validate_draft({
+		"character_id": "Invalid/Name",
+		"rigged_meshes": {"primary": "", "secondary": ""},
+		"prompt": ""
+	}, true)
+	if not _check(validation_errors.size() == 4, "draft validation did not report every missing field"): return
+	var run_v1 := store.create_generation_run("draft_character", {"positive_prompt": "v1 prompt", "negative_prompt": "v1 negative", "seed": 7})
+	if not _check(run_v1.ok, run_v1.get("error", "v1 run failed")): return
+	if not _check(run_v1.manifest.generation.runs[0].version == "v1", "first generation run was not v1"): return
+	if not _check(DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(test_root.path_join("characters/draft_character/references/v1"))), "v1 reference folder was not created"): return
+	var run_v2 := store.create_generation_run("draft_character", {"positive_prompt": "v2 prompt", "seed": 8})
+	if not _check(run_v2.ok, run_v2.get("error", "v2 run failed")): return
+	if not _check(run_v2.manifest.generation.runs[1].version == "v2", "second generation run was not v2"): return
+	if not _check(DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(test_root.path_join("characters/draft_character/references/v2"))), "v2 reference folder was not created"): return
+	if not _check(run_v2.manifest.generation.runs[0].positive_prompt == "v1 prompt", "v1 prompt was overwritten"): return
+	var queued_v2 := store.update_generation_run("draft_character", "v2", {
+		"status": "queued",
+		"prompt_id": "prompt-test-2",
+		"queued_at": "2026-08-12T00:00:00"
+	})
+	if not _check(queued_v2.ok, queued_v2.get("error", "run queue update failed")): return
+	if not _check(queued_v2.manifest.generation.runs[1].prompt_id == "prompt-test-2", "prompt id was not recorded on run"): return
+	if not _check(queued_v2.manifest.generation.runs[1].status == "queued", "run status was not updated to queued"): return
+	if not _check(queued_v2.manifest.generation.runs[0].get("prompt_id", "") == "", "run update changed another version"): return
+	var completed_v2 := store.update_generation_run("draft_character", "v2", {
+		"status": "completed",
+		"completed_at": "2026-08-12T00:01:00",
+		"outputs": {"contact_sheet": "res://build_me_godot/characters/draft_character/references/v2/contact_sheet.png"}
+	})
+	if not _check(completed_v2.ok, completed_v2.get("error", "run completion update failed")): return
+	if not _check(completed_v2.manifest.generation.runs[1].outputs.contact_sheet.ends_with("contact_sheet.png"), "run outputs were not recorded"): return
+	var missing_run_update := store.update_generation_run("draft_character", "v99", {"status": "failed"})
+	if not _check(not missing_run_update.ok, "missing run update should fail"): return
+	var approved := store.approve_generation_version("draft_character", "v2")
+	if not _check(approved.ok, approved.get("error", "approval failed")): return
+	if not _check(approved.manifest.generation.selected_version == "v2", "selected version was not recorded"): return
+	if not _check(approved.manifest.stage == "reference_approved", "approval stage was not recorded"): return
+	var resaved_draft := store.save_draft({"character_id": "draft_character", "prompt": "updated after approval"})
+	if not _check(resaved_draft.ok, resaved_draft.get("error", "resave draft failed")): return
+	if not _check(resaved_draft.manifest.generation.runs.size() == 2, "draft resave wiped generation runs"): return
+	if not _check(resaved_draft.manifest.generation.selected_version == "v2", "draft resave wiped selected version"): return
+	if not _check(resaved_draft.manifest.stage == "reference_approved", "draft resave regressed stage"): return
+	var missing_version := store.approve_generation_version("draft_character", "v99")
+	if not _check(not missing_version.ok, "missing version approval should fail"): return
+	var final_assets := store.register_final_assets("draft_character", {
+		"character_scene": "res://build_me_godot/characters/draft_character/draft_character.tscn",
+		"animations": ["res://build_me_godot/characters/draft_character/animations/idle.res"],
+		"secondary_assets": [{"asset_id": "helmet", "scene": "res://build_me_godot/characters/draft_character/assets/helmet.tscn", "socket": "head"}]
+	})
+	if not _check(final_assets.ok, final_assets.get("error", "final asset registration failed")): return
+	if not _check(final_assets.manifest.stage == "complete", "final asset stage was not recorded"): return
+	if not _check(final_assets.manifest.assets.character_scene.ends_with("draft_character.tscn"), "character scene path was not recorded"): return
+	if not _check(final_assets.manifest.assets.animations.size() == 1, "animation paths were not recorded"): return
+	if not _check(final_assets.manifest.assets.secondary_assets[0].asset_id == "helmet", "secondary assets were not recorded"): return
 
 	var client := ComfyUIClient.new()
 	get_root().add_child(client)

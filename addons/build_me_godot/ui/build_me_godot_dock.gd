@@ -10,11 +10,16 @@ const Config = preload("res://addons/build_me_godot/services/config.gd")
 
 var store := CharacterStore.new()
 var character_select: OptionButton
+var project_context: Label
 var character_id: LineEdit
 var display_name: LineEdit
+var role: LineEdit
+var style_notes: LineEdit
 var prompt: TextEdit
 var negative_prompt: TextEdit
 var seed: SpinBox
+var primary_rigged_mesh: LineEdit
+var secondary_rigged_mesh: LineEdit
 var comfyui_url: LineEdit
 var comfyui_root: LineEdit
 var blender_path: LineEdit
@@ -27,6 +32,8 @@ var comfy_client: Node
 var environment_checker: Node
 var last_environment_report := {}
 var configuration_status: Label
+var pending_generation_character_id := ""
+var pending_generation_version := ""
 
 
 func _ready() -> void:
@@ -46,10 +53,22 @@ func _build_ui() -> void:
 	character_select.item_selected.connect(_on_character_selected)
 	add_child(character_select)
 
+	project_context = Label.new()
+	project_context.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	project_context.text = "Project: %s" % ProjectSettings.get_setting("application/config/name", "Unnamed project")
+	add_child(project_context)
+
 	character_id = _add_line_edit("Character ID", "field_engineer")
 	display_name = _add_line_edit("Display name", "Field Engineer")
+	role = _add_line_edit("Role / archetype", "construction field engineer")
+	style_notes = _add_line_edit("Style notes", "realistic game character")
 	prompt = _add_text_edit("Character prompt", 150)
 	negative_prompt = _add_text_edit("Negative prompt", 80)
+	var rigged_mesh_title := Label.new()
+	rigged_mesh_title.text = "Rigged mesh inputs"
+	add_child(rigged_mesh_title)
+	primary_rigged_mesh = _add_line_edit("Primary rigged mesh", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH)
+	secondary_rigged_mesh = _add_line_edit("Secondary rigged mesh", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH)
 
 	seed = SpinBox.new()
 	seed.min_value = 0
@@ -137,6 +156,7 @@ func _build_ui() -> void:
 
 	comfy_client = ComfyUIClient.new()
 	comfy_client.prompt_queued.connect(_on_prompt_queued)
+	comfy_client.history_received.connect(_on_history_received)
 	comfy_client.request_failed.connect(_on_comfy_error)
 	add_child(comfy_client)
 
@@ -186,8 +206,14 @@ func _on_character_selected(index: int) -> void:
 	var manifest: Dictionary = result.manifest
 	character_id.text = str(manifest.get("character_id", ""))
 	display_name.text = str(manifest.get("display_name", ""))
+	var metadata: Dictionary = manifest.get("metadata", {})
+	role.text = str(metadata.get("role", ""))
+	style_notes.text = str(metadata.get("style", ""))
 	prompt.text = str(manifest.get("prompt", ""))
 	negative_prompt.text = str(manifest.get("negative_prompt", ""))
+	var rigged_meshes: Dictionary = manifest.get("rigged_meshes", {})
+	primary_rigged_mesh.text = str(rigged_meshes.get("primary", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH))
+	secondary_rigged_mesh.text = str(rigged_meshes.get("secondary", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH))
 	seed.value = int(manifest.get("seed", 0))
 	_set_status("Loaded %s" % result.path)
 
@@ -196,26 +222,51 @@ func _new_character() -> void:
 	character_select.select(0)
 	character_id.clear()
 	display_name.clear()
+	role.clear()
+	style_notes.clear()
 	prompt.clear()
 	negative_prompt.clear()
+	primary_rigged_mesh.text = CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH
+	secondary_rigged_mesh.text = CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH
 	seed.value = 0
 	_set_status("Enter a character ID and prompt, then save.")
 
 
-func _save_character() -> void:
-	var result := store.save_character({
-		"character_id": character_id.text,
-		"display_name": display_name.text,
-		"prompt": prompt.text,
-		"negative_prompt": negative_prompt.text,
-		"seed": int(seed.value)
-	})
+func _save_character() -> Dictionary:
+	var values := _draft_values()
+	var errors := store.validate_draft(values)
+	if not errors.is_empty():
+		var result := {"ok": false, "error": "\n".join(errors)}
+		_set_status(result.error, true)
+		return result
+	var result := store.save_draft(values)
 	if not result.ok:
 		_set_status(result.error, true)
-		return
+		return result
 	character_id.text = result.manifest.character_id
 	_refresh_characters(result.manifest.character_id)
 	_set_status("Saved %s" % result.path)
+	return result
+
+
+func _draft_values() -> Dictionary:
+	return {
+		"character_id": character_id.text,
+		"display_name": display_name.text,
+		"metadata": {
+			"role": role.text.strip_edges(),
+			"style": style_notes.text.strip_edges(),
+			"pose_contract": "neutral_a_pose_30deg_v1"
+		},
+		"prompt": prompt.text,
+		"negative_prompt": negative_prompt.text,
+		"rigged_meshes": {
+			"primary": primary_rigged_mesh.text.strip_edges(),
+			"secondary": secondary_rigged_mesh.text.strip_edges()
+		},
+		"animation_asset": animation_asset.text.strip_edges(),
+		"seed": int(seed.value)
+	}
 
 
 func _create_field_engineer() -> void:
@@ -323,7 +374,13 @@ func _save_environment_report() -> void:
 
 
 func _queue_canonical() -> void:
-	_save_character()
+	var errors := store.validate_draft(_draft_values(), true)
+	if not errors.is_empty():
+		_set_status("\n".join(errors), true)
+		return
+	var saved := _save_character()
+	if not saved.ok:
+		return
 	var loaded := store.load_character(character_id.text)
 	if not loaded.ok:
 		_set_status(loaded.error, true)
@@ -336,19 +393,66 @@ func _queue_canonical() -> void:
 	if workflow.is_empty():
 		_set_status("The canonical workflow is missing required template inputs.", true)
 		return
+	var run := store.create_generation_run(saved.manifest.character_id, {
+		"workflow_id": "canonical_character_reference",
+		"workflow_version": "1",
+		"status": "pending",
+		"positive_prompt": str(saved.manifest.get("prompt", "")),
+		"negative_prompt": str(saved.manifest.get("negative_prompt", "")),
+		"seed": int(saved.manifest.get("seed", 0))
+	})
+	if not run.ok:
+		_set_status(run.error, true)
+		return
+	var runs: Array = run.manifest.generation.runs
+	var run_record: Dictionary = runs[runs.size() - 1]
+	pending_generation_character_id = str(run.manifest.character_id)
+	pending_generation_version = str(run_record.version)
 	comfy_client.configure(comfyui_url.text)
 	var error: Error = comfy_client.queue_prompt(workflow)
 	if error != OK:
+		store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+			"status": "failed",
+			"error": "Could not start the ComfyUI queue request (%s)." % error_string(error),
+			"completed_at": Time.get_datetime_string_from_system(true)
+		})
 		_set_status("Could not start the ComfyUI queue request (%s)." % error_string(error), true)
 		return
-	_set_status("Submitting canonical character to ComfyUI…")
+	_set_status("Submitting %s to ComfyUI…" % pending_generation_version)
 
 
 func _on_prompt_queued(prompt_id: String) -> void:
-	_set_status("ComfyUI queued canonical prompt %s" % prompt_id)
+	if not pending_generation_character_id.is_empty() and not pending_generation_version.is_empty():
+		store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+			"status": "queued",
+			"prompt_id": prompt_id,
+			"queued_at": Time.get_datetime_string_from_system(true)
+		})
+	comfy_client.request_history(prompt_id)
+	_set_status("ComfyUI queued %s prompt %s" % [pending_generation_version, prompt_id])
+
+
+func _on_history_received(prompt_id: String, history: Dictionary) -> void:
+	if pending_generation_character_id.is_empty() or pending_generation_version.is_empty():
+		return
+	var prompt_history: Dictionary = history.get(prompt_id, {})
+	var updates := {
+		"status": "completed" if prompt_history.has("outputs") else "queued",
+		"history": prompt_history,
+		"completed_at": Time.get_datetime_string_from_system(true) if prompt_history.has("outputs") else ""
+	}
+	store.update_generation_run(pending_generation_character_id, pending_generation_version, updates)
+	if prompt_history.has("outputs"):
+		_set_status("ComfyUI completed %s." % pending_generation_version)
 
 
 func _on_comfy_error(message: String) -> void:
+	if not pending_generation_character_id.is_empty() and not pending_generation_version.is_empty():
+		store.update_generation_run(pending_generation_character_id, pending_generation_version, {
+			"status": "failed",
+			"error": message,
+			"completed_at": Time.get_datetime_string_from_system(true)
+		})
 	_set_status(message, true)
 
 

@@ -34,6 +34,31 @@ Machine configuration resolves from command-line overrides, `BUILD_ME_GODOT_*` e
 
 The plugin can run with only `addons/build_me_godot/` installed in a Godot project, plus user-configured external tools such as ComfyUI and Blender. The top-level `build_me_godot/` and `utils/` folders support this repository's local asset-production workflow.
 
+## Godot-first character workflow
+
+Open the Build Me Godot dock inside the target Godot project. The addon records project context, two rigged mesh slots, character metadata, positive/negative prompts, generation settings, and later outputs in `res://build_me_godot/characters/<character_id>/character.json`.
+
+The intended loop is:
+
+1. Create or select a character draft in Godot.
+2. Confirm the primary and secondary rigged mesh inputs for the project.
+3. Enter the character name, role/style metadata, and prompts.
+4. Queue a local ComfyUI reference workflow from the dock.
+5. Review the generated version, iterate prompts into `v1`, `v2`, and later runs, then approve one version.
+6. Explicitly continue the downstream pipeline. This writes `blender/<version>/reference_inputs.json` for Blender automation and advances the manifest stage.
+7. Register the final Godot scene, animations, and secondary assets back into the same character manifest when downstream work completes.
+
+Headless agents can inspect and apply approved manifest transitions without running external setup or downloads:
+
+```bash
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- inspect --character-id field_engineer
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- continue --character-id field_engineer --version v1
+```
+
+With `--no-header`, these commands emit JSON on stdout. Mutating commands only update project-local files under `res://build_me_godot/`; they do not install ComfyUI nodes, download model weights, run Blender, or start unrelated pipeline stages.
+
 ## Local setup utilities
 
 Run the local requirement helper from this repository when preparing a Linux workstation:
@@ -84,6 +109,7 @@ Open this repository directly in Godot to exercise the addon. A character is rep
 ```bash
 godot --headless --editor --path . --quit
 godot --headless --path . --script res://tests/test_character_store.gd
+bash tests/test_character_cli.sh
 PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
   addons/build_me_godot/integrations/comfyui/character_turnaround_output.py \
   addons/build_me_godot/integrations/blender/build_humanoid_character.py \

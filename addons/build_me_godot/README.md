@@ -26,6 +26,23 @@ The addon stores character manifests and generated work under `res://build_me_go
 
 Machine configuration resolves from CLI overrides, `BUILD_ME_GODOT_*` environment variables, `res://build_me_godot.local.cfg`, global Editor Settings, then packaged defaults. The local file is gitignored and readable headlessly. Copy [the example](build_me_godot.local.cfg.example) to the project root or create it with **Save for this project** in the dock; **Save for me** writes global editor defaults.
 
+## Character workflow
+
+Build Me Godot is driven from the target Godot project. Open the dock, create or select a character, confirm the two rigged mesh inputs, enter character metadata and prompts, then queue a local ComfyUI reference run. Runs are stored as sequential `v1`, `v2`, and later versions in `res://build_me_godot/characters/<character_id>/character.json`.
+
+After reviewing generated references, approve one completed version and explicitly continue the pipeline. Continuation writes `res://build_me_godot/characters/<character_id>/blender/<version>/reference_inputs.json` for the Blender stage and advances the manifest to `pipeline_enabled`. Final character scenes, animations, and secondary assets are registered back into the same manifest when downstream work completes.
+
+For agent or CI use, the addon exposes deterministic JSON commands:
+
+```bash
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- inspect --character-id field_engineer
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- continue --character-id field_engineer --version v1
+```
+
+With `--no-header`, these commands write only project-local manifest and handoff files and emit JSON on stdout. They do not install external tools, download model weights, run Blender, or launch unrelated stages.
+
 ## Optional last-mile editing
 
 [Gator Model Studio](https://store.godotengine.org/asset/blackwater-gator-studios/gator-model-studio/) by Blackwater Gator Studios can provide an in-Godot last-mile refinement path for generated meshes, UVs, materials, rigs, weights, animations, and collisions. It is an optional, independently installed addon and is not redistributed by Build Me Godot. Blender remains the default automated processing path.
