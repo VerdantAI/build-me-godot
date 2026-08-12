@@ -442,7 +442,14 @@ def action_detail_lines(action: Action) -> list[str]:
     if action.id == "download.models":
         models = details.get("models", [])
         lines = [f"Download {len(models)} model file(s) into: {details.get('directory', '')}"]
-        lines.extend(f"- {row.get('value', '')}" for row in models)
+        for row in models:
+            lines.extend([
+                f"- {row.get('value', '')}",
+                f"  license: {row.get('license', '') or 'not declared'}",
+                f"  source: {row.get('repository', '')}",
+                f"  url: {row.get('url', '')}",
+                f"  target after move: {row.get('target_dir', '')}",
+            ])
         return lines
     if action.id == "move.models":
         staged = details.get("staged_ready", [])
@@ -574,6 +581,7 @@ def report(ctx: Context) -> dict[str, Any]:
 
 
 def print_human(ctx: Context, include_actions: bool) -> None:
+    print_review(ctx)
     if include_actions:
         print("\nAvailable actions:")
         for action in ctx.actions:
@@ -585,6 +593,33 @@ def print_human(ctx: Context, include_actions: bool) -> None:
             print(f"curl --location --fail --continue-at - --output './{row['value']}' '{row['url']}'")
 
 
+def print_review(ctx: Context) -> None:
+    helper_actions = [action for action in ctx.actions if action.id == "install.comfyui.helper"]
+    if helper_actions or ctx.missing_nodes:
+        print("\nCustom node review:")
+    for action in helper_actions:
+        print("- Build Me Godot helper install:")
+        print(f"  source: {action.details.get('source', '')}")
+        print(f"  target: {action.details.get('target', '')}")
+        print("  restart required: yes")
+    if ctx.missing_nodes:
+        print("- Missing workflow node classes:")
+        for node in ctx.missing_nodes:
+            print(f"  - {node}")
+        print("- If the Build Me Godot helper was just installed, restart ComfyUI and recheck.")
+        print("- Other missing classes must be reviewed and installed explicitly in ComfyUI.")
+
+    if ctx.missing_models:
+        print("\nModel download review:")
+        for row in ctx.missing_models:
+            print(f"- {row['value']}")
+            print(f"  license: {row.get('license') or 'not declared'}")
+            print(f"  source: {row.get('repository') or 'not declared'}")
+            print(f"  url: {row['url']}")
+            print(f"  staging: {row['staged_path']}")
+            print(f"  target after move: {row['target_dir']}")
+
+
 def print_setup_guidance(ctx: Context) -> None:
     print("\nSetup assistant:")
     print("- Details: ./utils/check-local-requirements.sh doctor")
@@ -592,6 +627,8 @@ def print_setup_guidance(ctx: Context) -> None:
     print("\nAGENT HANDOFF:")
     print("  Ask an agent to run: ./utils/check-local-requirements.sh plan --json")
     print("  Then approve specific: ./utils/check-local-requirements.sh apply <action_id> --yes --json")
+
+    print_review(ctx)
 
     ready_actions = [action for action in ctx.actions if action.mutates and action.ready]
     blocked_actions = [action for action in ctx.actions if action.mutates and not action.ready]

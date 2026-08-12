@@ -6,7 +6,8 @@ agents:
 
 - `setup` is the default command. It checks the machine, prints detail/help
   commands, shows a prominent `AGENT HANDOFF` command block, lists ready
-  actions, and asks before applying each action.
+  actions, reviews missing custom nodes/model downloads, and asks before
+  applying each action.
 - `check` is read-only and reports current state.
 - `plan` is read-only and reports available remediation action IDs.
 - `doctor` is a human-readable alias for `plan`.
@@ -34,6 +35,10 @@ operation and ask before proceeding. Model downloads are staged first; moving
 them into ComfyUI is a separate action. Terminal downloads show a progress bar;
 `--json` keeps progress output silent for agents. Incomplete downloads use a
 `.part` suffix and are removed after cancellation or failure.
+
+Human output includes review sections for missing ComfyUI custom node classes
+and model downloads. Model reviews include the declared license, source
+repository, download URL, staging path, and target ComfyUI model directory.
 
 Machine-readable reports include:
 

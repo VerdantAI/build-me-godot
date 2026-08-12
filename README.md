@@ -42,7 +42,7 @@ Run the local requirement helper from this repository when preparing a Linux wor
 utils/check-local-requirements.sh
 ```
 
-With no command, the helper checks the machine, lists ready setup actions, and asks before applying each one. It also prints detail/help commands and a prominent `AGENT HANDOFF` command block.
+With no command, the helper checks the machine, reviews missing ComfyUI custom nodes and model downloads, lists ready setup actions, and asks before applying each one. It also prints detail/help commands and a prominent `AGENT HANDOFF` command block.
 
 The helper can also write a reusable, gitignored local config:
 
@@ -65,7 +65,7 @@ utils/check-local-requirements.sh apply move.models
 
 The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, pulls Ollama models, or writes config. Mutating `apply` commands explain the planned change and ask for confirmation by default; use `--yes` only after a specific action has already been approved for non-interactive or JSON automation.
 
-When declared workflow model files are missing, the helper prints `curl` download commands for the reviewed Apache-2.0 artifacts. `apply download.models` downloads files into the configured staging directory with a terminal progress bar, writes in-progress downloads to `.part` files, and removes partial downloads after cancellation or failure. `apply move.models` moves staged files into the correct ComfyUI `models/` subdirectory without overwriting existing files.
+When declared workflow model files are missing, the helper prints a download review with the declared license, source repository, URL, staging path, and target ComfyUI directory, plus `curl` commands for the reviewed Apache-2.0 artifacts. `apply download.models` downloads files into the configured staging directory with a terminal progress bar, writes in-progress downloads to `.part` files, and removes partial downloads after cancellation or failure. `apply move.models` moves staged files into the correct ComfyUI `models/` subdirectory without overwriting existing files.
 
 ## Optional last-mile editing
 
