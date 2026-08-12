@@ -5,6 +5,7 @@ project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 comfyui_url="${BUILD_ME_GODOT_COMFYUI_URL:-http://127.0.0.1:8188}"
 comfyui_root="${BUILD_ME_GODOT_COMFYUI_ROOT:-}"
+comfyui_root_source=""
 workflow_requirements=(
     "$project_root/addons/build_me_godot/workflows/canonical_only_api.requirements.json"
     "$project_root/addons/build_me_godot/workflows/multiview_only_api.requirements.json"
@@ -19,7 +20,9 @@ Usage: utils/check-local-requirements.sh [options]
 
 Checks local Build Me Godot requirements and prints explicit user-run install
 commands for anything missing. The script does not install packages, download
-models, or modify external tool directories.
+models, or modify external tool directories. If --comfyui-root is omitted, the
+script tries to discover a running local ComfyUI process and prompts for the
+root directory when running interactively.
 
 Options:
   --comfyui-url URL          ComfyUI server URL. Default: http://127.0.0.1:8188
@@ -83,6 +86,108 @@ record_warning() {
 
 print_check() {
     printf '[%s] %s\n' "$1" "$2"
+}
+
+join_lines() {
+    awk 'BEGIN {first = 1} {if (!first) printf ", "; printf "%s", $0; first = 0}'
+}
+
+is_comfyui_root() {
+    local candidate="$1"
+    [[ -n "$candidate" ]] || return 1
+    [[ -d "$candidate/custom_nodes" ]] || return 1
+    [[ -d "$candidate/models" || -f "$candidate/main.py" || -d "$candidate/user" ]]
+}
+
+comfyui_port_from_url() {
+    sed -E 's#^[a-zA-Z]+://(\[[^]]+\]|[^/:]+):([0-9]+).*#\2#' <<<"$comfyui_url"
+}
+
+discover_comfyui_root_from_listener() {
+    have_command ss || return 1
+
+    local port pid cwd parent
+    port=$(comfyui_port_from_url)
+    [[ "$port" =~ ^[0-9]+$ ]] || return 1
+
+    pid=$(ss -ltnp 2>/dev/null \
+        | awk -v port=":$port" '$4 ~ port "$" {print $0; exit}' \
+        | sed -nE 's/.*pid=([0-9]+).*/\1/p')
+    [[ -n "$pid" ]] || return 1
+
+    cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+    if is_comfyui_root "$cwd"; then
+        comfyui_root="$cwd"
+        comfyui_root_source="running process cwd for pid $pid"
+        return 0
+    fi
+
+    parent=$(dirname "$cwd" 2>/dev/null || true)
+    if is_comfyui_root "$parent"; then
+        comfyui_root="$parent"
+        comfyui_root_source="parent of running process cwd for pid $pid"
+        return 0
+    fi
+
+    return 1
+}
+
+discover_comfyui_root_from_common_paths() {
+    local candidate
+    for candidate in \
+        "$PWD/ComfyUI" \
+        "$HOME/ComfyUI" \
+        "$HOME/src/ComfyUI" \
+        "$HOME/verdant/ComfyUI" \
+        "$HOME/.local/share/ComfyUI"; do
+        if is_comfyui_root "$candidate"; then
+            comfyui_root="$candidate"
+            comfyui_root_source="common path"
+            return 0
+        fi
+    done
+    return 1
+}
+
+resolve_comfyui_root() {
+    if [[ -n "$comfyui_root" ]]; then
+        if is_comfyui_root "$comfyui_root"; then
+            comfyui_root_source="${comfyui_root_source:-configured path}"
+            print_check "ok" "ComfyUI root: $comfyui_root ($comfyui_root_source)"
+        else
+            print_check "missing" "Configured ComfyUI root is not valid: $comfyui_root"
+            record_missing "Configured ComfyUI root" \
+                "Set BUILD_ME_GODOT_COMFYUI_ROOT or rerun with --comfyui-root /path/to/ComfyUI."
+            comfyui_root=""
+        fi
+        return
+    fi
+
+    if discover_comfyui_root_from_listener || discover_comfyui_root_from_common_paths; then
+        print_check "ok" "ComfyUI root: $comfyui_root ($comfyui_root_source)"
+        return
+    fi
+
+    if [[ "$interactive" -eq 1 && -t 0 ]]; then
+        local entered
+        printf '[prompt] ComfyUI root was not found automatically.\n'
+        read -r -p "Enter ComfyUI root path, or leave blank to skip file checks: " entered
+        if [[ -n "$entered" ]]; then
+            if is_comfyui_root "$entered"; then
+                comfyui_root="$entered"
+                comfyui_root_source="interactive prompt"
+                print_check "ok" "ComfyUI root: $comfyui_root ($comfyui_root_source)"
+            else
+                print_check "missing" "ComfyUI root path is not valid: $entered"
+                record_missing "ComfyUI root" \
+                    "Rerun with --comfyui-root /path/to/ComfyUI after selecting an existing ComfyUI directory."
+            fi
+        else
+            print_check "skip" "ComfyUI root file checks"
+        fi
+    else
+        print_check "skip" "ComfyUI root: not configured and not discovered"
+    fi
 }
 
 check_command() {
@@ -175,7 +280,7 @@ check_comfyui_nodes() {
         print_check "ok" "ComfyUI required workflow nodes"
     else
         local unique
-        unique=$(printf '%s\n' "${missing[@]}" | sort -u | paste -sd ', ' -)
+        unique=$(printf '%s\n' "${missing[@]}" | sort -u | join_lines)
         print_check "missing" "ComfyUI required workflow nodes: $unique"
         record_missing "ComfyUI required workflow nodes" \
             "Open ComfyUI Manager and install the missing node packs, then restart ComfyUI. Missing classes: $unique"
@@ -294,6 +399,7 @@ main() {
     check_command jq "jq executable" "Install jq with your Linux package manager."
     check_http "$comfyui_url/system_stats" "ComfyUI server at $comfyui_url" \
         "Start ComfyUI: comfyui --listen 127.0.0.1 --port 8188"
+    resolve_comfyui_root
     check_comfyui_helper
     check_comfyui_nodes
     check_comfyui_model_files

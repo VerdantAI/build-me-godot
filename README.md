@@ -44,7 +44,7 @@ utils/check-local-requirements.sh \
   --ollama-model llama3.1:8b
 ```
 
-The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. It prints missing requirements and suggested commands, but it does not install packages, download model weights, modify ComfyUI, or change system configuration. Treat every suggested install or model-pull command as a separate user action.
+The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process and prompts for a path in interactive shells. It prints missing requirements and suggested commands, but it does not install packages, download model weights, modify ComfyUI, or change system configuration. Treat every suggested install or model-pull command as a separate user action.
 
 ## Optional last-mile editing
 
