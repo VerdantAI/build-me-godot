@@ -31,7 +31,9 @@ utils/check-local-requirements.sh apply move.models --yes --json
 Do not run `apply` actions unless the user has approved the specific action ID.
 Without `--yes`, interactive `setup` and `apply` commands show the planned file
 operation and ask before proceeding. Model downloads are staged first; moving
-them into ComfyUI is a separate action.
+them into ComfyUI is a separate action. Terminal downloads show a progress bar;
+`--json` keeps progress output silent for agents. Incomplete downloads use a
+`.part` suffix and are removed after cancellation or failure.
 
 Machine-readable reports include:
 

@@ -380,6 +380,54 @@ def write_config(ctx: Context) -> Path:
     return ctx.config_path
 
 
+def format_bytes(value: int) -> str:
+    amount = float(value)
+    for unit in ["B", "KiB", "MiB", "GiB"]:
+        if amount < 1024.0 or unit == "GiB":
+            return f"{amount:.1f} {unit}" if unit != "B" else f"{int(amount)} B"
+        amount /= 1024.0
+    return f"{value} B"
+
+
+class DownloadProgress:
+    def __init__(self, label: str, enabled: bool) -> None:
+        self.label = label
+        self.enabled = enabled
+        self.last_percent = -1
+        self.last_bucket = -1
+        self.finished = False
+
+    def hook(self, block_count: int, block_size: int, total_size: int) -> None:
+        if not self.enabled:
+            return
+        downloaded = block_count * block_size
+        if total_size > 0:
+            downloaded = min(downloaded, total_size)
+            percent = int(downloaded * 100 / total_size)
+            if percent == self.last_percent and percent < 100:
+                return
+            self.last_percent = percent
+            width = 28
+            filled = int(width * percent / 100)
+            bar = "#" * filled + "-" * (width - filled)
+            sys.stderr.write(
+                f"\r  [{bar}] {percent:3d}% {format_bytes(downloaded)} / {format_bytes(total_size)} {self.label}"
+            )
+        else:
+            bucket = downloaded // (1024 * 1024)
+            if bucket == self.last_bucket:
+                return
+            self.last_bucket = bucket
+            sys.stderr.write(f"\r  {format_bytes(downloaded)} downloaded {self.label}")
+        sys.stderr.flush()
+
+    def finish(self) -> None:
+        if self.enabled and not self.finished:
+            sys.stderr.write("\n")
+            sys.stderr.flush()
+        self.finished = True
+
+
 def action_detail_lines(action: Action) -> list[str]:
     details = action.details
     if action.id == "write.local.config":
@@ -446,11 +494,24 @@ def execute_action(ctx: Context, action_id: str) -> None:
         ctx.model_download_dir.mkdir(parents=True, exist_ok=True)
         for row in ctx.missing_models:
             target = Path(row["staged_path"])
+            partial = target.with_name(target.name + ".part")
             if target.exists():
                 emit(f"Already staged: {target}")
                 continue
+            if partial.exists():
+                partial.unlink()
             emit(f"Downloading {row['value']}")
-            urllib.request.urlretrieve(row["url"], target)
+            progress = DownloadProgress(row["value"], enabled=not ctx.json_output and sys.stderr.isatty())
+            try:
+                urllib.request.urlretrieve(row["url"], partial, progress.hook)
+                partial.replace(target)
+            except BaseException:
+                if partial.exists():
+                    partial.unlink()
+                    emit(f"Removed partial download: {partial}")
+                raise
+            finally:
+                progress.finish()
             ctx.changed_paths.append(str(target))
     elif action_id == "move.models":
         moved = 0
