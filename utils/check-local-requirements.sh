@@ -2,19 +2,41 @@
 set -euo pipefail
 
 project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-download_dir=$(pwd -P)
+default_config_path="$project_root/utils/check-local-requirements.local.conf"
+config_path="${BUILD_ME_GODOT_SETUP_CONFIG:-$default_config_path}"
+
+raw_args=("$@")
+for ((i = 0; i < ${#raw_args[@]}; i++)); do
+    if [[ "${raw_args[$i]}" == "--config" ]]; then
+        config_path="${raw_args[$((i + 1))]:?--config requires a value}"
+        break
+    fi
+done
+
+if [[ -f "$config_path" ]]; then
+    # shellcheck source=/dev/null
+    source "$config_path"
+fi
 
 comfyui_url="${BUILD_ME_GODOT_COMFYUI_URL:-http://127.0.0.1:8188}"
 comfyui_root="${BUILD_ME_GODOT_COMFYUI_ROOT:-}"
 comfyui_root_source=""
+download_dir="${BUILD_ME_GODOT_MODEL_DOWNLOAD_DIR:-$(pwd -P)}"
+blender_path="${BUILD_ME_GODOT_BLENDER_PATH:-blender}"
+ollama_host="${BUILD_ME_GODOT_OLLAMA_HOST:-${OLLAMA_HOST:-http://127.0.0.1:11434}}"
+ollama_models_dir="${BUILD_ME_GODOT_OLLAMA_MODELS_DIR:-${OLLAMA_MODELS:-$HOME/.ollama/models}}"
 workflow_requirements=(
     "$project_root/addons/build_me_godot/workflows/canonical_only_api.requirements.json"
     "$project_root/addons/build_me_godot/workflows/multiview_only_api.requirements.json"
     "$project_root/build_me_godot/workflows/qwen_blender_reference_set_ui.requirements.json"
 )
 ollama_models=()
+if [[ -n "${BUILD_ME_GODOT_OLLAMA_MODELS:-}" ]]; then
+    read -r -a ollama_models <<<"${BUILD_ME_GODOT_OLLAMA_MODELS}"
+fi
 interactive=1
 download_missing_models=0
+write_local_config=0
 missing_model_rows=()
 
 usage() {
@@ -28,9 +50,13 @@ script tries to discover a running local ComfyUI process and prompts for the
 root directory when running interactively.
 
 Options:
+  --config PATH              Read setup defaults from PATH.
   --comfyui-url URL          ComfyUI server URL. Default: http://127.0.0.1:8188
   --comfyui-root PATH        Existing local ComfyUI root for model-file checks.
+  --blender PATH             Blender executable path or command. Default: blender
+  --model-download-dir PATH  Directory for optional model downloads. Default: $PWD
   --download-missing-models  Download missing declared model files to $PWD.
+  --write-local-config       Write discovered/current settings to local config.
   --ollama-model NAME        Required local Ollama model. Can be repeated.
   --non-interactive          Print remediation without prompting.
   -h, --help                 Show this help.
@@ -43,12 +69,25 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --config)
+            config_path="${2:?--config requires a value}"
+            shift 2
+            ;;
         --comfyui-url)
             comfyui_url="${2:?--comfyui-url requires a value}"
             shift 2
             ;;
         --comfyui-root)
             comfyui_root="${2:?--comfyui-root requires a value}"
+            comfyui_root_source="command line"
+            shift 2
+            ;;
+        --blender)
+            blender_path="${2:?--blender requires a value}"
+            shift 2
+            ;;
+        --model-download-dir)
+            download_dir="${2:?--model-download-dir requires a value}"
             shift 2
             ;;
         --ollama-model)
@@ -57,6 +96,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --download-missing-models)
             download_missing_models=1
+            shift
+            ;;
+        --write-local-config)
+            write_local_config=1
             shift
             ;;
         --non-interactive)
@@ -78,6 +121,9 @@ done
 missing_labels=()
 missing_commands=()
 warn_labels=()
+detected_godot_path=""
+detected_blender_path=""
+detected_ollama_path=""
 
 have_command() {
     command -v "$1" >/dev/null 2>&1
@@ -96,8 +142,21 @@ print_check() {
     printf '[%s] %s\n' "$1" "$2"
 }
 
+shell_quote() {
+    printf '%q' "$1"
+}
+
 join_lines() {
     awk 'BEGIN {first = 1} {if (!first) printf ", "; printf "%s", $0; first = 0}'
+}
+
+resolve_executable() {
+    local executable="$1"
+    if [[ "$executable" == */* ]]; then
+        [[ -x "$executable" ]] && printf '%s\n' "$executable"
+    else
+        command -v "$executable" 2>/dev/null || true
+    fi
 }
 
 is_comfyui_root() {
@@ -205,6 +264,26 @@ check_command() {
 
     if have_command "$command_name"; then
         print_check "ok" "$label: $(command -v "$command_name")"
+    else
+        print_check "missing" "$label"
+        record_missing "$label" "$install_hint"
+    fi
+}
+
+check_executable() {
+    local executable="$1"
+    local label="$2"
+    local install_hint="$3"
+    local detected
+
+    detected=$(resolve_executable "$executable")
+    if [[ -n "$detected" ]]; then
+        print_check "ok" "$label: $detected"
+        case "$label" in
+            "Godot executable") detected_godot_path="$detected" ;;
+            "Blender executable") detected_blender_path="$detected" ;;
+            "Ollama executable") detected_ollama_path="$detected" ;;
+        esac
     else
         print_check "missing" "$label"
         record_missing "$label" "$install_hint"
@@ -439,9 +518,9 @@ check_ollama_models() {
         return
     fi
 
-    if ! have_command ollama; then
-        print_check "missing" "Ollama executable"
-        record_missing "Ollama executable" "Install Ollama from https://ollama.com/download/linux, then run this script again."
+    check_executable "ollama" "Ollama executable" \
+        "Install Ollama from https://ollama.com/download/linux, then run this script again."
+    if [[ -z "$detected_ollama_path" ]]; then
         return
     fi
 
@@ -460,6 +539,65 @@ check_ollama_models() {
             record_missing "Ollama model $model" "ollama pull '$model'"
         fi
     done
+}
+
+write_config_file() {
+    local target="$1"
+    local target_dir
+    target_dir=$(dirname "$target")
+    mkdir -p "$target_dir"
+
+    local ollama_model_text=""
+    if [[ ${#ollama_models[@]} -gt 0 ]]; then
+        ollama_model_text="${ollama_models[*]}"
+    fi
+
+    cat >"$target" <<EOF
+# Build Me Godot local setup configuration.
+# This file is machine-local and intentionally gitignored.
+
+BUILD_ME_GODOT_COMFYUI_URL=$(shell_quote "$comfyui_url")
+BUILD_ME_GODOT_COMFYUI_ROOT=$(shell_quote "$comfyui_root")
+BUILD_ME_GODOT_MODEL_DOWNLOAD_DIR=$(shell_quote "$download_dir")
+BUILD_ME_GODOT_BLENDER_PATH=$(shell_quote "${detected_blender_path:-$blender_path}")
+BUILD_ME_GODOT_OLLAMA_HOST=$(shell_quote "$ollama_host")
+BUILD_ME_GODOT_OLLAMA_MODELS_DIR=$(shell_quote "$ollama_models_dir")
+BUILD_ME_GODOT_OLLAMA_MODELS=$(shell_quote "$ollama_model_text")
+
+# ComfyUI model placement guide:
+# text encoders: \$BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/
+# diffusion models: \$BUILD_ME_GODOT_COMFYUI_ROOT/models/diffusion_models/
+# VAEs: \$BUILD_ME_GODOT_COMFYUI_ROOT/models/vae/
+# LoRAs: \$BUILD_ME_GODOT_COMFYUI_ROOT/models/loras/
+EOF
+    print_check "ok" "Wrote local setup config: $target"
+}
+
+maybe_write_local_config() {
+    if [[ "$write_local_config" -eq 1 ]]; then
+        write_config_file "$config_path"
+        return
+    fi
+
+    if [[ -f "$config_path" ]]; then
+        return
+    fi
+
+    if [[ "$interactive" -eq 1 && -t 0 ]]; then
+        local answer
+        printf '\nLocal config option:\n'
+        printf 'Write discovered setup paths for reuse?\n'
+        printf 'Target: %s\n' "$config_path"
+        read -r -p "Write local config now? [y/N] " answer
+        case "$answer" in
+            y|Y|yes|YES)
+                write_config_file "$config_path"
+                ;;
+            *)
+                printf 'Skipped local config write.\n'
+                ;;
+        esac
+    fi
 }
 
 print_remediation() {
@@ -487,8 +625,9 @@ main() {
     printf 'Project: %s\n\n' "$project_root"
 
     check_godot_project
-    check_command godot "Godot executable" "Install Godot 4.x and ensure 'godot' is on PATH."
-    check_command blender "Blender executable" "Install Blender 4.2+ and ensure 'blender' is on PATH."
+    check_executable godot "Godot executable" "Install Godot 4.x and ensure 'godot' is on PATH."
+    check_executable "$blender_path" "Blender executable" \
+        "Install Blender 4.2+ and ensure the configured Blender command or path is executable."
     check_command curl "curl executable" "Install curl with your Linux package manager."
     check_command jq "jq executable" "Install jq with your Linux package manager."
     check_http "$comfyui_url/system_stats" "ComfyUI server at $comfyui_url" \
@@ -499,6 +638,7 @@ main() {
     check_comfyui_model_files
     check_ollama_models
     maybe_prompt_download_missing_models
+    maybe_write_local_config
 
     if [[ ${#warn_labels[@]} -gt 0 ]]; then
         printf '\nWarnings:\n'

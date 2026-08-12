@@ -6,6 +6,7 @@
 !/build_me_godot/workflows/
 !/build_me_godot/workflows/**
 build_me_godot.local.cfg
+utils/check-local-requirements.local.conf
 
 # Godot-specific ignores
 *.translation

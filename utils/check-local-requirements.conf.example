@@ -1,0 +1,25 @@
+# Build Me Godot local setup configuration example.
+# Copy to utils/check-local-requirements.local.conf or run:
+#   utils/check-local-requirements.sh --write-local-config
+
+# Local ComfyUI server and root directory.
+BUILD_ME_GODOT_COMFYUI_URL='http://127.0.0.1:8188'
+BUILD_ME_GODOT_COMFYUI_ROOT='/home/you/src/ComfyUI'
+
+# Directory where optional model downloads are staged for manual inspection.
+# The setup script writes downloads here, not directly into ComfyUI.
+BUILD_ME_GODOT_MODEL_DOWNLOAD_DIR='/home/you/Downloads/build-me-godot-models'
+
+# Blender executable path or command name.
+BUILD_ME_GODOT_BLENDER_PATH='blender'
+
+# Optional Ollama settings. Separate multiple models with spaces.
+BUILD_ME_GODOT_OLLAMA_HOST='http://127.0.0.1:11434'
+BUILD_ME_GODOT_OLLAMA_MODELS_DIR='/home/you/.ollama/models'
+BUILD_ME_GODOT_OLLAMA_MODELS='llama3.1:8b'
+
+# ComfyUI model placement guide:
+# text encoders: $BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/
+# diffusion models: $BUILD_ME_GODOT_COMFYUI_ROOT/models/diffusion_models/
+# VAEs: $BUILD_ME_GODOT_COMFYUI_ROOT/models/vae/
+# LoRAs: $BUILD_ME_GODOT_COMFYUI_ROOT/models/loras/
