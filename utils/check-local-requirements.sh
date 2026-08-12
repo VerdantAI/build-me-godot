@@ -2,6 +2,7 @@
 set -euo pipefail
 
 project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+download_dir=$(pwd -P)
 
 comfyui_url="${BUILD_ME_GODOT_COMFYUI_URL:-http://127.0.0.1:8188}"
 comfyui_root="${BUILD_ME_GODOT_COMFYUI_ROOT:-}"
@@ -13,6 +14,8 @@ workflow_requirements=(
 )
 ollama_models=()
 interactive=1
+download_missing_models=0
+missing_model_rows=()
 
 usage() {
     cat <<'EOF'
@@ -27,6 +30,7 @@ root directory when running interactively.
 Options:
   --comfyui-url URL          ComfyUI server URL. Default: http://127.0.0.1:8188
   --comfyui-root PATH        Existing local ComfyUI root for model-file checks.
+  --download-missing-models  Download missing declared model files to $PWD.
   --ollama-model NAME        Required local Ollama model. Can be repeated.
   --non-interactive          Print remediation without prompting.
   -h, --help                 Show this help.
@@ -50,6 +54,10 @@ while [[ $# -gt 0 ]]; do
         --ollama-model)
             ollama_models+=("${2:?--ollama-model requires a value}")
             shift 2
+            ;;
+        --download-missing-models)
+            download_missing_models=1
+            shift
             ;;
         --non-interactive)
             interactive=0
@@ -289,12 +297,92 @@ check_comfyui_nodes() {
 
 model_subdirs_for_loader() {
     case "$1" in
-        CLIPLoader) printf '%s\n' "models/clip" ;;
+        CLIPLoader) printf '%s\n' "models/text_encoders" "models/clip" ;;
         VAELoader) printf '%s\n' "models/vae" ;;
         UNETLoader) printf '%s\n' "models/unet" "models/diffusion_models" ;;
         LoraLoaderModelOnly) printf '%s\n' "models/loras" ;;
         *) printf '%s\n' "models" ;;
     esac
+}
+
+model_download_url() {
+    local repository="$1"
+    local value="$2"
+
+    case "$repository|$value" in
+        "Comfy-Org/Qwen-Image_ComfyUI|qwen_2.5_vl_7b_fp8_scaled.safetensors")
+            printf '%s\n' "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+            ;;
+        "Comfy-Org/Qwen-Image_ComfyUI|qwen_image_vae.safetensors")
+            printf '%s\n' "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors"
+            ;;
+        "Comfy-Org/Qwen-Image_ComfyUI|qwen_image_2512_fp8_e4m3fn.safetensors")
+            printf '%s\n' "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors"
+            ;;
+        "Comfy-Org/Qwen-Image-Edit_ComfyUI|qwen_image_edit_2511_fp8mixed.safetensors")
+            printf '%s\n' "https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors"
+            ;;
+        "lightx2v/Qwen-Image-Edit-2511-Lightning|Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors")
+            printf '%s\n' "https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
+            ;;
+        "Wuli-art/Qwen-Image-2512-Turbo-LoRA-2-Steps|Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors")
+            printf '%s\n' "https://huggingface.co/Wuli-art/Qwen-Image-2512-Turbo-LoRA-2-Steps/resolve/main/Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"
+            ;;
+        *)
+            printf '%s\n' "https://huggingface.co/$repository/resolve/main/$value"
+            ;;
+    esac
+}
+
+download_missing_model_files() {
+    if [[ ${#missing_model_rows[@]} -eq 0 ]]; then
+        return
+    fi
+    if ! have_command curl; then
+        record_missing "Model downloader" "Install curl before using --download-missing-models."
+        return
+    fi
+
+    local row loader value repository url target
+    printf '\nDownloading missing model files into current directory:\n%s\n\n' "$download_dir"
+    for row in "${missing_model_rows[@]}"; do
+        IFS=$'\t' read -r loader value repository url <<<"$row"
+        target="$download_dir/$value"
+        if [[ -f "$target" ]]; then
+            printf '[ok] %s already exists in current directory\n' "$value"
+            continue
+        fi
+        printf '[download] %s\n' "$value"
+        printf '           %s\n' "$url"
+        curl --location --fail --continue-at - --output "$target" "$url"
+    done
+}
+
+maybe_prompt_download_missing_models() {
+    if [[ ${#missing_model_rows[@]} -eq 0 ]]; then
+        return
+    fi
+
+    if [[ "$download_missing_models" -eq 1 ]]; then
+        download_missing_model_files
+        return
+    fi
+
+    if [[ "$interactive" -eq 1 && -t 0 ]]; then
+        local answer
+        printf '\nMissing model download option:\n'
+        printf 'Download missing declared model files into current directory?\n'
+        printf 'Target: %s\n' "$download_dir"
+        read -r -p "Download now? [y/N] " answer
+        case "$answer" in
+            y|Y|yes|YES)
+                download_missing_model_files
+                ;;
+            *)
+                printf 'Skipped model downloads.\n'
+                ;;
+        esac
+    fi
 }
 
 check_comfyui_model_files() {
@@ -320,6 +408,7 @@ check_comfyui_model_files() {
         done < <(model_subdirs_for_loader "$loader")
         if [[ "$found" -eq 0 ]]; then
             missing+=("$value from $repository")
+            missing_model_rows+=("$loader"$'\t'"$value"$'\t'"$repository"$'\t'"$(model_download_url "$repository" "$value")")
         fi
     done < <(
         for requirements_path in "${workflow_requirements[@]}"; do
@@ -333,9 +422,14 @@ check_comfyui_model_files() {
     else
         local summary
         summary=$(printf '%s\n' "${missing[@]}" | sed 's/^/  - /')
+        local commands
+        commands=$(for row in "${missing_model_rows[@]}"; do
+            IFS=$'\t' read -r loader value repository url <<<"$row"
+            printf "curl --location --fail --continue-at - --output './%s' '%s'\n" "$value" "$url"
+        done)
         print_check "missing" "ComfyUI declared model files"
         record_missing "ComfyUI declared model files" \
-            "Download the declared Apache-2.0 model artifacts manually into '$comfyui_root/models/*':"$'\n'"$summary"
+            "Download the declared Apache-2.0 model artifacts manually into the current directory ($download_dir), then move them into the matching ComfyUI models subdirectories:"$'\n'"$summary"$'\n\n'"Download commands:"$'\n'"$commands"
     fi
 }
 
@@ -404,6 +498,7 @@ main() {
     check_comfyui_nodes
     check_comfyui_model_files
     check_ollama_models
+    maybe_prompt_download_missing_models
 
     if [[ ${#warn_labels[@]} -gt 0 ]]; then
         printf '\nWarnings:\n'

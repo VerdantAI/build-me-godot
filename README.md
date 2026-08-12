@@ -46,6 +46,8 @@ utils/check-local-requirements.sh \
 
 The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process and prompts for a path in interactive shells. It prints missing requirements and suggested commands, but it does not install packages, download model weights, modify ComfyUI, or change system configuration. Treat every suggested install or model-pull command as a separate user action.
 
+When declared workflow model files are missing, the helper prints `curl` download commands for the reviewed Apache-2.0 artifacts. In an interactive shell it can prompt before downloading, or you can pass `--download-missing-models`; downloaded files are written to the current directory so they can be inspected and moved into the correct ComfyUI `models/` subdirectory explicitly.
+
 ## Optional last-mile editing
 
 [Gator Model Studio](https://store.godotengine.org/asset/blackwater-gator-studios/gator-model-studio/) by Blackwater Gator Studios is a promising in-Godot last-mile option for interactively refining generated assets. Its modelling, UV, material, rigging, weight-painting, animation, collision, remeshing, and GLB tools complement Build Me Godot's orchestration and validation goals. It is optional, independently installed, and is not bundled with this addon. Blender remains the default automated processing path.
