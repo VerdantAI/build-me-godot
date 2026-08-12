@@ -1,6 +1,6 @@
 # Build Me Godot local setup configuration example.
 # Copy to utils/check-local-requirements.local.conf or run:
-#   utils/check-local-requirements.sh --write-local-config
+#   utils/check-local-requirements.sh apply write.local.config
 
 # Local ComfyUI server and root directory.
 BUILD_ME_GODOT_COMFYUI_URL='http://127.0.0.1:8188'

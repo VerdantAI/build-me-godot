@@ -39,7 +39,7 @@ The plugin can run with only `addons/build_me_godot/` installed in a Godot proje
 Run the local requirement helper from this repository when preparing a Linux workstation:
 
 ```bash
-utils/check-local-requirements.sh \
+utils/check-local-requirements.sh check \
   --comfyui-root "$HOME/src/ComfyUI" \
   --ollama-model llama3.1:8b
 ```
@@ -47,14 +47,24 @@ utils/check-local-requirements.sh \
 The helper can also write a reusable, gitignored local config:
 
 ```bash
-utils/check-local-requirements.sh --write-local-config
+utils/check-local-requirements.sh apply write.local.config
 ```
 
 Use [utils/check-local-requirements.conf.example](utils/check-local-requirements.conf.example) as the checked-in template. The generated `utils/check-local-requirements.local.conf` records ComfyUI URL/root, model staging directory, Blender executable, and Ollama host/model paths for later runs.
 
-The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process and prompts for a path in interactive shells. It prints missing requirements and suggested commands, but it does not install packages, download model weights, modify ComfyUI, or change system configuration. Treat every suggested install or model-pull command as a separate user action.
+The helper is a Python setup app with a shell wrapper. Use `check` for read-only diagnostics, `plan` to list available remediation actions, and `apply <action_id>` for explicit mutations:
 
-When declared workflow model files are missing, the helper prints `curl` download commands for the reviewed Apache-2.0 artifacts. In an interactive shell it can prompt before downloading, or you can pass `--download-missing-models`; downloaded files are written to the current directory so they can be inspected and moved into the correct ComfyUI `models/` subdirectory explicitly.
+```bash
+utils/check-local-requirements.sh check --json
+utils/check-local-requirements.sh plan --json
+utils/check-local-requirements.sh apply install.comfyui.helper
+utils/check-local-requirements.sh apply download.models
+utils/check-local-requirements.sh apply move.models
+```
+
+The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, pulls Ollama models, or writes config.
+
+When declared workflow model files are missing, the helper prints `curl` download commands for the reviewed Apache-2.0 artifacts. `apply download.models` downloads files into the configured staging directory, and `apply move.models` moves staged files into the correct ComfyUI `models/` subdirectory without overwriting existing files.
 
 ## Optional last-mile editing
 
