@@ -114,11 +114,14 @@
   QTR rigs while the original meshes continue targeting the original rigs.
 - [x] 9.5 Limit visible Rigify collections to facial authoring controls and tag
   the generated full rigs as authoring-only and excluded from production export.
-- [ ] 9.6 Fit male and female facial metarig landmarks to brows, eyelids, eyes,
+- [x] 9.6 Split the shared baseline into reproducible female and male working
+  files, each containing one complete QTR character plus its matching Rigify
+  facial-authoring scaffolding.
+- [ ] 9.7 Fit male and female facial metarig landmarks to brows, eyelids, eyes,
   cheeks, nose, lips, jaw, ears, teeth, and tongue with artist review.
-- [ ] 9.7 Add reviewed facial deformation weights or morph targets without
+- [ ] 9.8 Add reviewed facial deformation weights or morph targets without
   replacing existing QTR body weights or production topology.
-- [ ] 9.8 Add a rest-space face attachment from the fitted Rigify face chain to
+- [ ] 9.9 Add a rest-space face attachment from the fitted Rigify face chain to
   QTR `Head`; do not parent the complete Rigify object to an animated head bone.
-- [ ] 9.9 Add blink, jaw-open, smile, frown, brow-raise, and eye-look validation
+- [ ] 9.10 Add blink, jaw-open, smile, frown, brow-raise, and eye-look validation
   poses, then define a deformation-only glTF/Godot export contract.

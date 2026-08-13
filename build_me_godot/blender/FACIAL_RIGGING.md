@@ -80,3 +80,21 @@ The eventual Godot export must keep the Quaternius-compatible humanoid body
 skeleton and use Godot `SkeletonProfileHumanoid` for body retargeting. Facial
 deformation is exported as an additive layer. For morph-target export, enable
 glTF **Export Deformation Bones Only**.
+
+## Per-character working files
+
+Keep `field_engineers.blend` as the shared source baseline. Create isolated
+artist working files explicitly with:
+
+```bash
+blender -b build_me_godot/blender/field_engineers.blend \
+  --python build_me_godot/blender/tools/split_face_working_files.py -- \
+  --sex female --output build_me_godot/blender/field_engineer_female_face.blend
+blender -b build_me_godot/blender/field_engineers.blend \
+  --python build_me_godot/blender/tools/split_face_working_files.py -- \
+  --sex male --output build_me_godot/blender/field_engineer_male_face.blend
+```
+
+Each derived file contains one duplicate QTR body rig and mesh set, one Rigify
+metarig/control rig, and its matching widget collection. The opposite character
+and both original source collections are removed only from the derived file.

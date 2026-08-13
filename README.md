@@ -148,7 +148,8 @@ PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
   build_me_godot/blender/tools/prepare_rigify_face_experiment.py \
   build_me_godot/blender/tools/fit_rigify_face_baseline.py \
   build_me_godot/blender/tools/generate_rigify_face_controls.py \
-  build_me_godot/blender/tools/integrate_rigify_face_layer.py
+  build_me_godot/blender/tools/integrate_rigify_face_layer.py \
+  build_me_godot/blender/tools/split_face_working_files.py
 bash tests/test_environment_cli.sh
 bash tests/test_local_tools.sh
 bash tests/test_setup_services.sh
