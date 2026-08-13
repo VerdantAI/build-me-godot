@@ -381,10 +381,13 @@ def run_checks(ctx: Context) -> None:
 def check_example_project(ctx: Context) -> None:
     example = ctx.example_project
     addon_target = example / "addons" / "build_me_godot"
+    expected_plugin = addon_target / "plugin.cfg"
     details = {
         "project": str(example),
         "target": str(addon_target),
         "source": str(ADDON_SOURCE),
+        "expected_plugin": str(expected_plugin),
+        "source_plugin": str(ADDON_SOURCE / "plugin.cfg"),
     }
     if not (example / "project.godot").exists():
         add_check(ctx, Check(
@@ -396,16 +399,22 @@ def check_example_project(ctx: Context) -> None:
         ))
         return
 
+    if not (ADDON_SOURCE / "plugin.cfg").exists():
+        details["source_valid"] = False
+        add_check(ctx, Check("example.addon.symlink", "warning", "Build Me Godot addon package source is missing plugin.cfg", required=False, details=details))
+        return
+
     if addon_target.is_symlink():
         actual = addon_target.resolve()
         details["actual"] = str(actual)
-        if actual == ADDON_SOURCE.resolve():
-            add_check(ctx, Check("example.addon.symlink", "ok", "Example project Build Me Godot addon symlink", required=False, details=details))
+        details["actual_plugin"] = str(actual / "plugin.cfg")
+        if actual == ADDON_SOURCE.resolve() and expected_plugin.exists():
+            add_check(ctx, Check("example.addon.symlink", "ok", "Example project Build Me Godot addon symlink has correct package shape", required=False, details=details))
         else:
-            add_check(ctx, Check("example.addon.symlink", "warning", "Example project addon symlink points elsewhere", required=False, details=details))
+            add_check(ctx, Check("example.addon.symlink", "warning", "Example project addon symlink does not point to addons/build_me_godot with plugin.cfg", required=False, details=details))
             add_action(ctx, Action(
                 "link.example.addon",
-                "Replace the example project's Build Me Godot addon symlink with this checkout.",
+                "Replace the example project's Build Me Godot addon symlink with the addon package directory from this checkout.",
                 True,
                 details=details | {"replace_existing_symlink": True},
             ))
@@ -415,7 +424,7 @@ def check_example_project(ctx: Context) -> None:
         add_check(ctx, Check("example.addon.symlink", "warning", "Example project addon path exists but is not a symlink", required=False, details=details))
         add_action(ctx, Action(
             "link.example.addon",
-            "Create the example project Build Me Godot addon symlink.",
+            "Create the example project Build Me Godot addon symlink to the addon package directory.",
             True,
             ready=False,
             details=details | {"blocked_by_existing_path": True},
@@ -423,7 +432,7 @@ def check_example_project(ctx: Context) -> None:
         return
 
     add_check(ctx, Check("example.addon.symlink", "missing", "Example project Build Me Godot addon symlink", required=False, details=details))
-    add_action(ctx, Action("link.example.addon", "Create the example project Build Me Godot addon symlink.", True, details=details))
+    add_action(ctx, Action("link.example.addon", "Create the example project Build Me Godot addon symlink to the addon package directory.", True, details=details))
 
 
 def write_config(ctx: Context) -> Path:
@@ -543,8 +552,9 @@ def action_detail_lines(action: Action) -> list[str]:
     if action.id == "link.example.addon":
         lines = [
             f"Example project: {details.get('project', '')}",
-            f"Symlink target: {details.get('target', '')}",
+            f"Symlink path: {details.get('target', '')}",
             f"Symlink source: {details.get('source', '')}",
+            f"Expected plugin: {details.get('expected_plugin', '')}",
         ]
         if details.get("replace_existing_symlink"):
             lines.append("Existing symlink will be replaced.")
@@ -647,16 +657,23 @@ def execute_action(ctx: Context, action_id: str) -> None:
         example = ctx.example_project
         if not (example / "project.godot").exists():
             raise SystemExit(f"Example project not found: {example}")
+        if not (ADDON_SOURCE / "plugin.cfg").exists():
+            raise SystemExit(f"Addon package source is missing plugin.cfg: {ADDON_SOURCE}")
         target = example / "addons" / "build_me_godot"
         if target.exists() or target.is_symlink():
             if not target.is_symlink():
                 raise SystemExit(f"Refusing to overwrite non-symlink path: {target}")
             if target.resolve() == ADDON_SOURCE.resolve():
-                emit(f"Already linked: {target} -> {ADDON_SOURCE}")
-                return
+                if (target / "plugin.cfg").exists():
+                    emit(f"Already linked: {target} -> {ADDON_SOURCE}")
+                    return
+                raise SystemExit(f"Existing addon symlink does not expose plugin.cfg at expected path: {target / 'plugin.cfg'}")
             target.unlink()
         target.parent.mkdir(parents=True, exist_ok=True)
         target.symlink_to(ADDON_SOURCE)
+        if not (target / "plugin.cfg").exists():
+            target.unlink()
+            raise SystemExit(f"Created symlink did not expose plugin.cfg at expected path: {target / 'plugin.cfg'}")
         ctx.changed_paths.append(str(target))
         emit(f"Linked {target} -> {ADDON_SOURCE}")
     elif action_id.startswith("pull.ollama."):

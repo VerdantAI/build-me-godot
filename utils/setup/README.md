@@ -46,9 +46,18 @@ that action.
 
 When the companion `godot-addons-example-project` is present next to this
 repository, setup checks whether its `addons/build_me_godot` path is a symlink
-to this checkout. If it is missing, `link.example.addon` offers to create the
-development symlink. Override the project location with
-`--example-project /path/to/project` or `BUILD_ME_GODOT_EXAMPLE_PROJECT`.
+to this checkout's addon package directory. If it is missing,
+`link.example.addon` offers to create the development symlink:
+
+```text
+example/addons/build_me_godot -> build-me-godot/addons/build_me_godot
+```
+
+The resulting Godot plugin path must be
+`example/addons/build_me_godot/plugin.cfg`. The setup app refuses to overwrite a
+normal directory and verifies `plugin.cfg` after creating or accepting a
+symlink. Override the project location with `--example-project /path/to/project`
+or `BUILD_ME_GODOT_EXAMPLE_PROJECT`.
 
 Machine-readable reports include:
 

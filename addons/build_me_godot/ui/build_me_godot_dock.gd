@@ -65,28 +65,29 @@ func _build_ui() -> void:
 	project_context.text = "Project: %s" % ProjectSettings.get_setting("application/config/name", "Unnamed project")
 	add_child(project_context)
 
-	character_id = _add_line_edit("Character ID", "field_engineer")
-	display_name = _add_line_edit("Display name", "Field Engineer")
-	role = _add_line_edit("Role / archetype", "construction field engineer")
-	style_notes = _add_line_edit("Style notes", "realistic game character")
-	prompt = _add_text_edit("Character prompt", 150)
+	var tabs := TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(tabs)
+
+	var draft_tab := _add_tab(tabs, "1 Draft")
+	character_id = _add_line_edit(draft_tab, "Character ID", "field_engineer")
+	display_name = _add_line_edit(draft_tab, "Display name", "Field Engineer")
+	role = _add_line_edit(draft_tab, "Role / archetype", "construction field engineer")
+	style_notes = _add_line_edit(draft_tab, "Style notes", "realistic game character")
+	prompt = _add_text_edit(draft_tab, "Character prompt", 150)
 	prompt.text = DEFAULT_PROMPT
 	prompt.tooltip_text = "Edit the subject, clothing, silhouette, style, and pose constraints; keep full-body neutral reference requirements for Blender."
-	negative_prompt = _add_text_edit("Negative prompt", 80)
+	negative_prompt = _add_text_edit(draft_tab, "Negative prompt", 80)
 	negative_prompt.text = DEFAULT_NEGATIVE_PROMPT
 	negative_prompt.tooltip_text = "Edit unwanted crops, pose drift, extra limbs, perspective distortion, lighting issues, and background clutter."
-	var rigged_mesh_title := Label.new()
-	rigged_mesh_title.text = "Rigged mesh inputs"
-	add_child(rigged_mesh_title)
-	primary_rigged_mesh = _add_line_edit("Primary rigged mesh", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH)
-	secondary_rigged_mesh = _add_line_edit("Secondary rigged mesh", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH)
 
 	seed = SpinBox.new()
 	seed.min_value = 0
 	seed.max_value = 2147483647
 	seed.allow_greater = true
 	seed.value = 0
-	_add_labeled_control("Seed", seed)
+	_add_labeled_control(draft_tab, "Seed", seed)
 
 	var character_buttons := HBoxContainer.new()
 	var new_button := Button.new()
@@ -101,17 +102,16 @@ func _build_ui() -> void:
 	template_button.text = "Field Engineer example"
 	template_button.pressed.connect(_create_field_engineer)
 	character_buttons.add_child(template_button)
-	add_child(character_buttons)
+	draft_tab.add_child(character_buttons)
 
-	add_child(HSeparator.new())
-	var dependencies_title := Label.new()
-	dependencies_title.text = "Local dependencies"
-	add_child(dependencies_title)
-	comfyui_url = _add_line_edit("ComfyUI URL", "http://127.0.0.1:8188")
-	comfyui_root = _add_line_edit("ComfyUI directory", "/path/to/ComfyUI")
-	blender_path = _add_line_edit("Blender executable", "blender")
-	reconstruction_command = _add_line_edit("Reconstruction command", "/path/to/provider")
-	animation_asset = _add_line_edit("Animation library", "res://path/to/animations.glb")
+	var setup_tab := _add_tab(tabs, "2 Setup")
+	primary_rigged_mesh = _add_line_edit(setup_tab, "Primary rigged mesh", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH)
+	secondary_rigged_mesh = _add_line_edit(setup_tab, "Secondary rigged mesh", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH)
+	comfyui_url = _add_line_edit(setup_tab, "ComfyUI URL", "http://127.0.0.1:8188")
+	comfyui_root = _add_line_edit(setup_tab, "ComfyUI directory", "/path/to/ComfyUI")
+	blender_path = _add_line_edit(setup_tab, "Blender executable", "blender")
+	reconstruction_command = _add_line_edit(setup_tab, "Reconstruction command", "/path/to/provider")
+	animation_asset = _add_line_edit(setup_tab, "Animation library", "res://path/to/animations.glb")
 	var settings_buttons := HBoxContainer.new()
 	var save_global_button := Button.new()
 	save_global_button.text = "Save for me"
@@ -123,19 +123,19 @@ func _build_ui() -> void:
 	save_local_button.tooltip_text = "Gitignored project settings also available to headless tools"
 	save_local_button.pressed.connect(_save_configuration.bind(true))
 	settings_buttons.add_child(save_local_button)
-	add_child(settings_buttons)
+	setup_tab.add_child(settings_buttons)
 	configuration_status = Label.new()
 	configuration_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(configuration_status)
+	setup_tab.add_child(configuration_status)
 	var probe_button := Button.new()
 	probe_button.text = "Check dependencies"
 	probe_button.pressed.connect(_check_dependencies)
-	add_child(probe_button)
+	setup_tab.add_child(probe_button)
 	var deep_probe_button := Button.new()
 	deep_probe_button.text = "Deep-check Blender"
 	deep_probe_button.tooltip_text = "Starts Blender in background mode and verifies the builder operators"
 	deep_probe_button.pressed.connect(_deep_check_dependencies)
-	add_child(deep_probe_button)
+	setup_tab.add_child(deep_probe_button)
 	var report_buttons := HBoxContainer.new()
 	var copy_report_button := Button.new()
 	copy_report_button.text = "Copy report"
@@ -145,40 +145,43 @@ func _build_ui() -> void:
 	save_report_button.text = "Save report"
 	save_report_button.pressed.connect(_save_environment_report)
 	report_buttons.add_child(save_report_button)
-	add_child(report_buttons)
+	setup_tab.add_child(report_buttons)
 	technical_details = CheckButton.new()
 	technical_details.text = "Show technical details"
 	technical_details.toggled.connect(_toggle_technical_details)
-	add_child(technical_details)
-	workflow_import_path = _add_line_edit("Comfy workflow JSON", "res://addons/build_me_godot/workflows/character_turnaround_open.json")
+	setup_tab.add_child(technical_details)
+	dependency_status = RichTextLabel.new()
+	dependency_status.fit_content = true
+	dependency_status.custom_minimum_size.y = 55
+	setup_tab.add_child(dependency_status)
+
+	var generate_tab := _add_tab(tabs, "3 Generate")
+	workflow_import_path = _add_line_edit(generate_tab, "Comfy workflow JSON", "res://addons/build_me_godot/workflows/character_turnaround_open.json")
 	var import_workflow_button := Button.new()
 	import_workflow_button.text = "Import workflow prompts"
 	import_workflow_button.tooltip_text = "Copy prompt fields from a ComfyUI workflow JSON into this Godot draft"
 	import_workflow_button.pressed.connect(_import_workflow_prompts)
-	add_child(import_workflow_button)
+	generate_tab.add_child(import_workflow_button)
 	var canonical_button := Button.new()
 	canonical_button.text = "Queue canonical character"
 	canonical_button.tooltip_text = "Explicitly queue the selected character in local ComfyUI"
 	canonical_button.pressed.connect(_queue_canonical)
-	add_child(canonical_button)
+	generate_tab.add_child(canonical_button)
 
-	add_child(HSeparator.new())
-	var review_title := Label.new()
-	review_title.text = "Reference review"
-	add_child(review_title)
+	var review_tab := _add_tab(tabs, "4 Review")
 	run_select = OptionButton.new()
 	run_select.tooltip_text = "Generated reference versions for the selected character"
 	run_select.item_selected.connect(_on_run_selected)
-	add_child(run_select)
+	review_tab.add_child(run_select)
 	reference_preview = TextureRect.new()
 	reference_preview.custom_minimum_size = Vector2(320, 180)
 	reference_preview.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	reference_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	add_child(reference_preview)
+	review_tab.add_child(reference_preview)
 	run_details = RichTextLabel.new()
 	run_details.fit_content = true
 	run_details.custom_minimum_size.y = 120
-	add_child(run_details)
+	review_tab.add_child(run_details)
 	var review_buttons := HBoxContainer.new()
 	var approve_button := Button.new()
 	approve_button.text = "Approve version"
@@ -196,12 +199,7 @@ func _build_ui() -> void:
 	open_comfy_button.text = "Open in ComfyUI"
 	open_comfy_button.pressed.connect(_open_selected_run_in_comfyui)
 	review_buttons.add_child(open_comfy_button)
-	add_child(review_buttons)
-
-	dependency_status = RichTextLabel.new()
-	dependency_status.fit_content = true
-	dependency_status.custom_minimum_size.y = 55
-	add_child(dependency_status)
+	review_tab.add_child(review_buttons)
 
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -217,26 +215,35 @@ func _build_ui() -> void:
 	add_child(environment_checker)
 
 
-func _add_line_edit(label_text: String, placeholder: String) -> LineEdit:
+func _add_tab(tabs: TabContainer, title: String) -> VBoxContainer:
+	var container := VBoxContainer.new()
+	container.name = title
+	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_child(container)
+	return container
+
+
+func _add_line_edit(parent: Control, label_text: String, placeholder: String) -> LineEdit:
 	var control := LineEdit.new()
 	control.placeholder_text = placeholder
-	_add_labeled_control(label_text, control)
+	_add_labeled_control(parent, label_text, control)
 	return control
 
 
-func _add_text_edit(label_text: String, minimum_height: float) -> TextEdit:
+func _add_text_edit(parent: Control, label_text: String, minimum_height: float) -> TextEdit:
 	var control := TextEdit.new()
 	control.custom_minimum_size.y = minimum_height
 	control.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-	_add_labeled_control(label_text, control)
+	_add_labeled_control(parent, label_text, control)
 	return control
 
 
-func _add_labeled_control(label_text: String, control: Control) -> void:
+func _add_labeled_control(parent: Control, label_text: String, control: Control) -> void:
 	var label := Label.new()
 	label.text = label_text
-	add_child(label)
-	add_child(control)
+	parent.add_child(label)
+	parent.add_child(control)
 
 
 func _refresh_characters(selected_id := "") -> void:
@@ -351,7 +358,7 @@ func _refresh_review(manifest: Dictionary) -> void:
 		run_details.text = "Queue a reference workflow to create v1."
 		return
 	for run in runs:
-		if not run is Dictionary:
+		if not (run is Dictionary):
 			continue
 		var version := str(run.get("version", ""))
 		var label := "%s - %s" % [version, str(run.get("status", "draft"))]
