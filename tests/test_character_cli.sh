@@ -41,14 +41,30 @@ jq -e '.manifest.prompt == "full body field engineer"' <<<"$inspect_output" >/de
 jq -e '.manifest.assets.character_scene == "" and (.manifest.assets.animations | length == 0)' <<<"$inspect_output" >/dev/null
 jq -e '.available_actions | index("queue")' <<<"$inspect_output" >/dev/null
 
+import_output=$(godot --no-header --headless --path "$test_root/project" \
+    --script res://addons/build_me_godot/cli/character_cli.gd -- \
+    import-workflow \
+    --character-id field_engineer \
+    --workflow-path res://addons/build_me_godot/workflows/character_turnaround_open.json)
+
+jq -e '.schema_version == 1 and .command == "import-workflow"' <<<"$import_output" >/dev/null
+jq -e '.manifest.prompt | startswith("Full-body game character reference")' <<<"$import_output" >/dev/null
+jq -e '.manifest.negative_prompt | contains("cropped head")' <<<"$import_output" >/dev/null
+jq -e '.manifest.seed == 424242' <<<"$import_output" >/dev/null
+
 queue_output=$(godot --no-header --headless --path "$test_root/project" \
     --script res://addons/build_me_godot/cli/character_cli.gd -- \
-    queue --character-id field_engineer)
+    queue \
+    --character-id field_engineer \
+    --workflow-path res://addons/build_me_godot/workflows/canonical_only_api.json)
 
 jq -e '.schema_version == 1 and .command == "queue"' <<<"$queue_output" >/dev/null
 jq -e '.manifest.generation.runs[0].version == "v1"' <<<"$queue_output" >/dev/null
 jq -e '.manifest.generation.runs[0].status == "pending"' <<<"$queue_output" >/dev/null
-jq -e '.manifest.generation.runs[0].positive_prompt == "full body field engineer"' <<<"$queue_output" >/dev/null
+jq -e '.manifest.generation.runs[0].positive_prompt | startswith("Full-body game character reference")' <<<"$queue_output" >/dev/null
+jq -e '.manifest.generation.runs[0].workflow_snapshot.path == "res://build_me_godot/characters/field_engineer/workflows/v1_api.json"' <<<"$queue_output" >/dev/null
+jq -e '.manifest.generation.runs[0].workflow_snapshot.sha256 | length > 0' <<<"$queue_output" >/dev/null
+test -f "$test_root/project/build_me_godot/characters/field_engineer/workflows/v1_api.json"
 
 manifest_path="$test_root/project/build_me_godot/characters/field_engineer/character.json"
 jq '.generation.runs[0].status = "completed" |

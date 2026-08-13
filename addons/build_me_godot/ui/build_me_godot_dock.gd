@@ -25,6 +25,7 @@ var comfyui_root: LineEdit
 var blender_path: LineEdit
 var reconstruction_command: LineEdit
 var animation_asset: LineEdit
+var workflow_import_path: LineEdit
 var dependency_status: RichTextLabel
 var technical_details: CheckButton
 var status: Label
@@ -142,6 +143,12 @@ func _build_ui() -> void:
 	technical_details.text = "Show technical details"
 	technical_details.toggled.connect(_toggle_technical_details)
 	add_child(technical_details)
+	workflow_import_path = _add_line_edit("Comfy workflow JSON", "res://addons/build_me_godot/workflows/character_turnaround_open.json")
+	var import_workflow_button := Button.new()
+	import_workflow_button.text = "Import workflow prompts"
+	import_workflow_button.tooltip_text = "Copy prompt fields from a ComfyUI workflow JSON into this Godot draft"
+	import_workflow_button.pressed.connect(_import_workflow_prompts)
+	add_child(import_workflow_button)
 	var canonical_button := Button.new()
 	canonical_button.text = "Queue canonical character"
 	canonical_button.tooltip_text = "Explicitly queue the selected character in local ComfyUI"
@@ -564,6 +571,34 @@ func _save_environment_report() -> void:
 	_set_status("Saved %s" % path)
 
 
+func _import_workflow_prompts() -> void:
+	var path := workflow_import_path.text.strip_edges()
+	if path.is_empty():
+		_set_status("Workflow JSON path is required.", true)
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		_set_status("Could not open workflow JSON: %s" % path, true)
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not (parsed is Dictionary):
+		_set_status("Workflow JSON did not parse as an object: %s" % path, true)
+		return
+	var fields := TurnaroundWorkflow.extract_prompt_fields(parsed)
+	if fields.is_empty():
+		_set_status("No importable prompt fields were found in %s." % path, true)
+		return
+	if fields.has("character_id") and not str(fields.character_id).strip_edges().is_empty():
+		character_id.text = str(fields.character_id)
+	if fields.has("prompt"):
+		prompt.text = str(fields.prompt)
+	if fields.has("negative_prompt"):
+		negative_prompt.text = str(fields.negative_prompt)
+	if fields.has("seed"):
+		seed.value = int(fields.seed)
+	_set_status("Imported prompt fields from %s. Save the draft to make Godot the source of truth." % path)
+
+
 func _queue_canonical() -> void:
 	var errors := store.validate_draft(_draft_values(), true)
 	if not errors.is_empty():
@@ -590,7 +625,10 @@ func _queue_canonical() -> void:
 		"status": "pending",
 		"positive_prompt": str(saved.manifest.get("prompt", "")),
 		"negative_prompt": str(saved.manifest.get("negative_prompt", "")),
-		"seed": int(saved.manifest.get("seed", 0))
+		"seed": int(saved.manifest.get("seed", 0)),
+		"workflow_snapshot": workflow,
+		"workflow_source_path": workflow_path,
+		"workflow_format": "api"
 	})
 	if not run.ok:
 		_set_status(run.error, true)

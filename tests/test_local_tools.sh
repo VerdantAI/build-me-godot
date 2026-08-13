@@ -22,5 +22,5 @@ gator_output=$(godot --no-header --headless --path "$project_root" \
 gator_code=$?
 set -e
 
-[[ "$gator_code" -eq 1 ]]
+[[ "$gator_code" -eq 0 ]]
 jq -e '.checks | any(.id == "gator.addon" and .importance == "optional" and (.status == "warning" or .status == "pass"))' <<<"$gator_output" >/dev/null

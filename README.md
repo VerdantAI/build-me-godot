@@ -75,6 +75,13 @@ godot --no-header --headless --path . --script res://addons/build_me_godot/cli/c
 
 With `--no-header`, these commands emit JSON on stdout. Mutating commands only update project-local files under `res://build_me_godot/`; they do not install ComfyUI nodes, download model weights, run Blender, or start unrelated pipeline stages.
 
+Godot remains the source of truth for prompts and run metadata. If a prompt is tuned directly in ComfyUI, import the workflow JSON back into the dock or with the `import-workflow` CLI command, review the fields, and save the draft before queueing another run. When Godot queues a workflow, it records the returned ComfyUI `prompt_id` and saves the configured API workflow snapshot under `res://build_me_godot/characters/<character_id>/workflows/<version>_api.json`; headless agents should replay or inspect that snapshot instead of trying to infer state from the ComfyUI editor.
+
+```bash
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- import-workflow --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/character_turnaround_open.json
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/canonical_only_api.json
+```
+
 ## Local setup utilities
 
 Run the local requirement helper from this repository when preparing a Linux workstation:

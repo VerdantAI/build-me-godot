@@ -226,11 +226,29 @@ lists. Prompt text is project data and may appear in project-local manifests,
 but support/report export should redact prompts by default unless the user
 chooses to include them.
 
+### Prompt ownership and ComfyUI tuning
+
+Godot owns durable prompts, run metadata, selected versions, output paths, and
+pipeline continuation state. ComfyUI remains a useful tuning surface, but the
+runner must not depend on whichever graph is currently open in a browser. When a
+user tunes a packaged workflow in ComfyUI, the addon can import supported prompt
+fields from exported workflow JSON into the character draft. The user then
+reviews and saves those fields in Godot before queueing.
+
+Each queued run should save the configured API workflow snapshot under
+`res://build_me_godot/characters/<character_id>/workflows/<version>_api.json`
+and record its source path and content hash in the run manifest. If ComfyUI
+returns a `prompt_id`, the run records it for polling and history lookup. This
+solves two failure modes: a Godot/agent runner can tell which ComfyUI run it is
+watching, and headless mode can reproduce the exact workflow without requiring
+the prompt text to be read from the ComfyUI editor.
+
 ## Risks / Trade-offs
 
 - ComfyUI output paths and prompt IDs can change. The integration should copy
-  approved outputs into project-local character folders rather than depending
-  on ComfyUI output retention.
+  approved outputs into project-local character folders and keep a queued
+  workflow snapshot rather than depending on ComfyUI output retention or editor
+  state.
 - Generated views may not align perfectly. The first implementation can support
   contact-sheet storage and later add assisted split/alignment tools.
 - Long-running generation can block editor UX if implemented synchronously.
@@ -261,10 +279,11 @@ chooses to include them.
 - Should contact-sheet splitting be automatic in the first implementation, or
   should the first version store the sheet and individual ComfyUI outputs when
   available?
-- Should prompts be stored verbatim in the manifest or in per-run sidecar files
-  referenced by the manifest?
-- Should “Open in ComfyUI” link to the current server history entry, copied
-  output folder, or both?
+- Should long prompts stay verbatim in the manifest long-term, or should a
+  later schema move them to per-run sidecar files while preserving the same
+  Godot-owned source-of-truth semantics?
+- Should “Open in ComfyUI” link to the server history entry keyed by
+  `prompt_id`, the copied output folder, or both?
 - What are the exact semantics of the two rigged mesh slots in the first
   implementation: production base plus fitting proxy, masculine/feminine bases,
   or project-defined roles?

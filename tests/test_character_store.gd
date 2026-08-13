@@ -66,11 +66,20 @@ func _init() -> void:
 	if not _check(run_v1.ok, run_v1.get("error", "v1 run failed")): return
 	if not _check(run_v1.manifest.generation.runs[0].version == "v1", "first generation run was not v1"): return
 	if not _check(DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(test_root.path_join("characters/draft_character/references/v1"))), "v1 reference folder was not created"): return
-	var run_v2 := store.create_generation_run("draft_character", {"positive_prompt": "v2 prompt", "seed": 8})
+	var run_v2 := store.create_generation_run("draft_character", {
+		"positive_prompt": "v2 prompt",
+		"seed": 8,
+		"workflow_snapshot": {"1": {"class_type": "PrimitiveStringMultiline", "inputs": {"value": "v2 prompt"}}},
+		"workflow_source_path": "res://addons/build_me_godot/workflows/canonical_only_api.json"
+	})
 	if not _check(run_v2.ok, run_v2.get("error", "v2 run failed")): return
 	if not _check(run_v2.manifest.generation.runs[1].version == "v2", "second generation run was not v2"): return
 	if not _check(DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(test_root.path_join("characters/draft_character/references/v2"))), "v2 reference folder was not created"): return
 	if not _check(run_v2.manifest.generation.runs[0].positive_prompt == "v1 prompt", "v1 prompt was overwritten"): return
+	if not _check(run_v2.manifest.generation.runs[1].workflow_snapshot.path.ends_with("workflows/v2_api.json"), "workflow snapshot path was not recorded"): return
+	if not _check(not str(run_v2.manifest.generation.runs[1].workflow_snapshot.sha256).is_empty(), "workflow snapshot hash was not recorded"): return
+	if not _check(run_v2.manifest.generation.runs[1].workflow_snapshot.source_path.ends_with("canonical_only_api.json"), "workflow source path was not recorded"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/workflows/v2_api.json")), "workflow snapshot was not written"): return
 	var queued_v2 := store.update_generation_run("draft_character", "v2", {
 		"status": "queued",
 		"prompt_id": "prompt-test-2",
@@ -151,6 +160,19 @@ func _init() -> void:
 	if not _check(configured["1"].inputs.value == "Updated prompt", "workflow prompt binding failed"): return
 	if not _check(configured["3"].inputs.value == 42, "workflow seed binding failed"): return
 	if not _check(configured["10"].inputs.value == "test_character", "workflow character binding failed"): return
+	var canonical_fields := TurnaroundWorkflow.extract_prompt_fields(workflow)
+	if not _check(canonical_fields.prompt.begins_with("Full-body game character reference"), "canonical prompt import failed"): return
+	if not _check(int(canonical_fields.seed) == 424242, "canonical seed import failed"): return
+	if not _check(canonical_fields.character_id == "field_engineer", "canonical character import failed"): return
+	var open_file := FileAccess.open("res://addons/build_me_godot/workflows/character_turnaround_open.json", FileAccess.READ)
+	if not _check(open_file != null, "open workflow could not be loaded"): return
+	var open_workflow = JSON.parse_string(open_file.get_as_text())
+	if not _check(open_workflow is Dictionary, "open workflow is malformed"): return
+	var open_fields := TurnaroundWorkflow.extract_prompt_fields(open_workflow)
+	if not _check(open_fields.prompt.begins_with("Full-body game character reference"), "open workflow prompt import failed"): return
+	if not _check(open_fields.negative_prompt.contains("cropped head"), "open workflow negative prompt import failed"): return
+	if not _check(int(open_fields.seed) == 424242, "open workflow seed import failed"): return
+	if not _check(open_fields.character_id == "field_engineer", "open workflow character import failed"): return
 	var canonical_errors := WorkflowRequirements.validate_workflow(
 		TurnaroundWorkflow.CANONICAL_WORKFLOW,
 		"res://addons/build_me_godot/workflows/canonical_only_api.requirements.json"

@@ -38,11 +38,14 @@ Build Me Godot is driven from the target Godot project. Open the dock, create or
 
 After reviewing generated references, approve one completed version and explicitly continue the pipeline. Continuation writes `res://build_me_godot/characters/<character_id>/blender/<version>/reference_inputs.json` for the Blender stage and advances the manifest to `pipeline_enabled`. Final character scenes, animations, and secondary assets are registered back into the same manifest when downstream work completes.
 
+Prompts are project data owned by Godot, not by the ComfyUI editor. You can still tune in ComfyUI: export the workflow JSON, import its prompt fields back into the dock or CLI, save the character draft, then queue from Godot. Queued runs record the ComfyUI `prompt_id` when available and save the configured API workflow snapshot under `res://build_me_godot/characters/<character_id>/workflows/<version>_api.json` for later agent or headless replay.
+
 For agent or CI use, the addon exposes deterministic JSON commands:
 
 ```bash
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- import-workflow --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/character_turnaround_open.json
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- inspect --character-id field_engineer
-godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/canonical_only_api.json
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve --character-id field_engineer --version v1
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- continue --character-id field_engineer --version v1
 ```

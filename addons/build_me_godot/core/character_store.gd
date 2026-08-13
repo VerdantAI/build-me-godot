@@ -131,6 +131,16 @@ func create_generation_run(character_id: String, values: Dictionary) -> Dictiona
 	var folder_error := _ensure_run_folders(str(manifest.character_id), version)
 	if folder_error != OK:
 		return {"ok": false, "error": "Could not create reference folders for %s: %s" % [version, error_string(folder_error)]}
+	var snapshot_result := _write_workflow_snapshot(str(manifest.character_id), version, values)
+	if not snapshot_result.ok:
+		return snapshot_result
+	if not str(snapshot_result.get("path", "")).is_empty():
+		run["workflow_snapshot"] = {
+			"path": snapshot_result.path,
+			"sha256": snapshot_result.sha256,
+			"source_path": str(values.get("workflow_source_path", "")),
+			"format": str(values.get("workflow_format", "api"))
+		}
 	runs.append(run)
 	generation["runs"] = runs
 	manifest["generation"] = generation
@@ -539,6 +549,23 @@ func _copy_file(source: String, destination: String) -> Error:
 		return FileAccess.get_open_error()
 	output.store_buffer(input.get_buffer(input.get_length()))
 	return OK
+
+
+func _write_workflow_snapshot(character_id: String, version: String, values: Dictionary) -> Dictionary:
+	var workflow = values.get("workflow_snapshot", {})
+	if not (workflow is Dictionary) or workflow.is_empty():
+		return {"ok": true, "path": "", "sha256": ""}
+	var path := characters_root.path_join(character_id).path_join("workflows").path_join("%s_api.json" % version)
+	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	if error != OK:
+		return {"ok": false, "error": "Could not create workflow snapshot directory: %s" % error_string(error)}
+	var text := JSON.stringify(workflow, "  ") + "\n"
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return {"ok": false, "error": "Could not write workflow snapshot: %s" % path}
+	file.store_string(text)
+	file.close()
+	return {"ok": true, "path": path, "sha256": text.sha256_text()}
 
 
 func _ensure_run_folders(character_id: String, version: String) -> Error:

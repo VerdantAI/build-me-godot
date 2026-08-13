@@ -88,6 +88,15 @@ The addon SHALL let users review generated reference outputs, inspect run
 history, edit prompts, rerun, and approve exactly one selected reference run for
 pipeline continuation.
 
+#### Scenario: Import tuned ComfyUI prompt fields
+
+- **GIVEN** the user tuned a packaged workflow in ComfyUI and exported workflow
+  JSON
+- **WHEN** the user imports that workflow into the character draft
+- **THEN** the addon copies supported prompt fields, negative prompt, seed, and
+  character name into the Godot draft for review
+- **AND** the draft remains the source of truth for future headless queueing.
+
 #### Scenario: Review output in Godot
 
 - **GIVEN** a character has at least one completed reference run
@@ -101,6 +110,14 @@ pipeline continuation.
 - **WHEN** the user edits the prompt and starts another generation
 - **THEN** the addon creates a new run ID and next sequential version tag
 - **AND** previous run outputs and provenance remain available for review.
+
+#### Scenario: Snapshot queued workflow
+
+- **GIVEN** a valid character draft is queued from Godot
+- **WHEN** the addon sends the configured workflow to ComfyUI
+- **THEN** the run records the ComfyUI prompt ID when available
+- **AND** the configured API workflow snapshot is saved under the character
+  folder with a content hash and source workflow path.
 
 #### Scenario: Approve a reference run
 
