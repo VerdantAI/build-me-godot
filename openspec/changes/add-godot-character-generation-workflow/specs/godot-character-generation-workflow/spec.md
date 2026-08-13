@@ -155,7 +155,29 @@ with animations and secondary assets when the downstream pipeline completes.
 - **WHEN** the user enables continuation
 - **THEN** the addon writes Blender reference input metadata under the
   character folder
+- **AND** the addon writes mesh-guidance metadata that maps approved reference
+  outputs to the primary and secondary rigged mesh inputs
 - **AND** the manifest records the stage transition and changed paths.
+
+#### Scenario: Generate mesh guidance from approved references
+
+- **GIVEN** a completed reference run is approved
+- **AND** primary and secondary rigged mesh inputs are assigned
+- **WHEN** the continuation stage prepares Blender handoff files
+- **THEN** the addon writes a project-local mesh guidance artifact containing
+  approved reference paths, rigged mesh paths, pose contract, view placement
+  hints, scale/alignment assumptions, prompt-derived style targets, and
+  secondary asset candidates
+- **AND** the guidance artifact states that source rigged meshes are immutable
+  references and must not be overwritten by downstream automation.
+
+#### Scenario: Block mesh guidance without required inputs
+
+- **GIVEN** a completed reference run is approved
+- **WHEN** approved reference outputs or required rigged mesh inputs are missing
+- **THEN** continuation remains blocked
+- **AND** the dock or headless command reports which input is missing
+- **AND** no Blender handoff artifact is written.
 
 #### Scenario: Register final character assets
 

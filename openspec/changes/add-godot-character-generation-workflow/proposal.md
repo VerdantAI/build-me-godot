@@ -29,6 +29,9 @@ rigging, validation, and Godot asset registration ambiguous.
   sequential selectable version tag such as `v1`, `v2`, and `v3`.
 - Add an explicit “continue pipeline” gate that turns an approved reference set
   into Blender reference inputs and subsequent rigged game-asset work.
+- Add a mesh-guidance stage that consumes the approved ComfyUI reference set,
+  compares it against the project rigged meshes, and records non-destructive
+  modeling/attachment guidance for the downstream Blender step.
 - Produce a Godot character scene containing the final rigged character,
   available animations, and secondary assets such as helmets, swords,
   clipboards, or other generated/equipped props.
@@ -60,6 +63,9 @@ rigging, validation, and Godot asset registration ambiguous.
   paths, final scene path, animation availability, and pipeline stage.
 - Adds file-management logic that imports/splits/normalizes ComfyUI outputs
   into `res://build_me_godot/characters/<character_id>/references/`.
+- Adds mesh-guidance metadata that maps approved reference views to the
+  primary and secondary rigged meshes without modifying production topology
+  automatically.
 - Adds ComfyUI queue/history integration for the Qwen multiview reference
   workflow through the existing local-only ComfyUI configuration.
 - Adds tests for manifest updates, repeatable output placement, prompt

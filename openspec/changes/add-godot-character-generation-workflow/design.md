@@ -76,9 +76,13 @@ or mutating steps remain explicit user actions.
 11. User can duplicate/edit the prompt and rerun, creating the next version tag.
 12. User approves one version as the selected reference set.
 13. User explicitly enables continuation of the rest of the pipeline.
-14. The addon creates normalized reference inputs for Blender automation and
-    advances the manifest stage.
-15. Once build/import is complete, the character, animations, and secondary
+14. The addon creates normalized reference inputs and mesh-guidance metadata
+    for Blender automation, mapping the approved views to the primary and
+    secondary rigged mesh inputs without modifying those source meshes.
+15. Blender-side automation uses that guidance to place reference planes,
+    identify silhouette/clothing/prop targets, and stage secondary assets for
+    explicit review.
+16. Once build/import is complete, the character, animations, and secondary
     assets are available as project-local scenes/resources.
 
 ## Character Manifest Shape
@@ -187,6 +191,33 @@ The “continue pipeline” button is disabled until:
 - the user marks a run approved;
 - the required rigged mesh slots are assigned;
 - readiness checks for the next stage pass or warnings are acknowledged.
+
+## Mesh Guidance Stage
+
+The next implementation stage starts after a reference run has been approved
+and continuation has been explicitly enabled. The addon should treat the
+ComfyUI output as visual guidance for the project meshes, not as authority to
+replace them.
+
+The continuation output should include a project-local guidance artifact such
+as `res://build_me_godot/characters/<character_id>/blender/<version>/mesh_guidance.json`
+with:
+
+- approved reference version and source image paths;
+- primary and secondary rigged mesh paths;
+- view-to-plane placement hints for front, side, back, and additional views;
+- expected pose contract, scale assumptions, and alignment notes;
+- silhouette, clothing, material, and color targets extracted from the prompt
+  and reference metadata;
+- secondary asset candidates such as helmets, swords, clipboards, tools, or
+  other props, including suggested sockets when known;
+- validation notes that remind downstream tooling to preserve rig names,
+  humanoid profile compatibility, and immutable source references.
+
+Blender automation may use this artifact to place reference planes, create
+work-in-progress meshes, stage attachments, and run validation checks. It must
+not silently decimate, remesh, overwrite, or reweight the user-provided rigged
+meshes as if the generated images were production topology.
 
 ## Godot UI
 
