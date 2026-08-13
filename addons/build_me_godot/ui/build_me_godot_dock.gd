@@ -8,8 +8,29 @@ const EnvironmentChecker = preload("res://addons/build_me_godot/services/environ
 const EnvironmentReport = preload("res://addons/build_me_godot/services/environment/environment_report.gd")
 const Config = preload("res://addons/build_me_godot/services/config.gd")
 
+class StatusIndicatorDot:
+	extends Control
+
+	var indicator_color := Color("6f7378")
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(12, 12)
+
+	func set_indicator_color(value: Color) -> void:
+		indicator_color = value
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_circle(size * 0.5, minf(size.x, size.y) * 0.35, indicator_color)
+
+
 const DEFAULT_PROMPT := "Full-body game character reference of a practical field engineer and surveyor, sturdy work boots, durable work trousers, canvas work jacket, utility belt, functional realistic clothing construction, neutral A-pose, arms approximately 30 degrees away from the torso, feet shoulder-width apart, neutral expression, straight posture, complete head and feet visible, centered, minimal perspective distortion, approximately orthographic character-development reference, uniform diffuse studio lighting, plain neutral light gray background, clothing seams and construction clearly visible, no props obscuring the body."
 const DEFAULT_NEGATIVE_PROMPT := "cropped head, cropped feet, missing limbs, extra limbs, crossed arms, crossed legs, action pose, contrapposto, foreshortening, wide angle, perspective distortion, dramatic lighting, hard cast shadow, cluttered background, handheld props, text, watermark"
+const DEFAULT_EXAMPLE_SCENE := "res://scenes/main.tscn"
+const INDICATOR_PASS := Color("43a047")
+const INDICATOR_FAIL := Color("d64545")
+const INDICATOR_WARNING := Color("d6a21f")
+const INDICATOR_UNKNOWN := Color("6f7378")
 
 var store := CharacterStore.new()
 var character_select: OptionButton
@@ -23,6 +44,7 @@ var negative_prompt: TextEdit
 var seed: SpinBox
 var primary_rigged_mesh: LineEdit
 var secondary_rigged_mesh: LineEdit
+var example_scene_path: LineEdit
 var comfyui_url: LineEdit
 var comfyui_root: LineEdit
 var blender_path: LineEdit
@@ -36,6 +58,7 @@ var comfy_client: Node
 var environment_checker: Node
 var last_environment_report := {}
 var configuration_status: Label
+var status_indicators := {}
 var pending_generation_character_id := ""
 var pending_generation_version := ""
 var run_select: OptionButton
@@ -105,8 +128,34 @@ func _build_ui() -> void:
 	draft_tab.add_child(character_buttons)
 
 	var setup_tab := _add_tab(tabs, "2 Setup")
+	var status_title := Label.new()
+	status_title.text = "Local status"
+	setup_tab.add_child(status_title)
+	var status_grid := GridContainer.new()
+	status_grid.columns = 2
+	status_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	setup_tab.add_child(status_grid)
+	_add_status_indicator(status_grid, "comfyui.root", "ComfyUI found")
+	_add_status_indicator(status_grid, "comfyui.reachable", "ComfyUI running")
+	_add_status_indicator(status_grid, "comfyui.nodes", "ComfyUI nodes")
+	_add_status_indicator(status_grid, "comfyui.models", "ComfyUI models")
+	_add_status_indicator(status_grid, "blender.executable", "Blender found")
+	_add_status_indicator(status_grid, "ollama.executable", "Ollama found")
+	_add_status_indicator(status_grid, "ollama.running", "Ollama running")
+	_add_status_indicator(status_grid, "animation.asset", "Animation asset")
+	_add_status_indicator(status_grid, "example.scene", "Example scene")
+
 	primary_rigged_mesh = _add_line_edit(setup_tab, "Primary rigged mesh", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH)
 	secondary_rigged_mesh = _add_line_edit(setup_tab, "Secondary rigged mesh", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH)
+	example_scene_path = _add_line_edit(setup_tab, "Example scene", DEFAULT_EXAMPLE_SCENE)
+	example_scene_path.text = DEFAULT_EXAMPLE_SCENE
+	var scene_buttons := HBoxContainer.new()
+	var open_example_scene_button := Button.new()
+	open_example_scene_button.text = "Open example scene"
+	open_example_scene_button.tooltip_text = "Open the project scene used to inspect the rigged mesh inputs"
+	open_example_scene_button.pressed.connect(_open_example_scene)
+	scene_buttons.add_child(open_example_scene_button)
+	setup_tab.add_child(scene_buttons)
 	comfyui_url = _add_line_edit(setup_tab, "ComfyUI URL", "http://127.0.0.1:8188")
 	comfyui_root = _add_line_edit(setup_tab, "ComfyUI directory", "/path/to/ComfyUI")
 	blender_path = _add_line_edit(setup_tab, "Blender executable", "blender")
@@ -244,6 +293,126 @@ func _add_labeled_control(parent: Control, label_text: String, control: Control)
 	label.text = label_text
 	parent.add_child(label)
 	parent.add_child(control)
+
+
+func _add_status_indicator(parent: Control, id: String, label_text: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	parent.add_child(label)
+
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var dot := StatusIndicatorDot.new()
+	row.add_child(dot)
+	var value := Label.new()
+	value.text = "Unchecked"
+	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(value)
+	parent.add_child(row)
+	status_indicators[id] = {"dot": dot, "value": value}
+	_set_status_indicator(id, "unknown", "Unchecked")
+
+
+func _set_status_indicator(id: String, state: String, text: String) -> void:
+	if not status_indicators.has(id):
+		return
+	var indicator: Dictionary = status_indicators[id]
+	var dot: StatusIndicatorDot = indicator.dot
+	var value: Label = indicator.value
+	match state:
+		"pass":
+			dot.set_indicator_color(INDICATOR_PASS)
+		"fail":
+			dot.set_indicator_color(INDICATOR_FAIL)
+		"warning":
+			dot.set_indicator_color(INDICATOR_WARNING)
+		_:
+			dot.set_indicator_color(INDICATOR_UNKNOWN)
+	value.text = text
+
+
+func _refresh_static_status_indicators() -> void:
+	var comfy_root_text := comfyui_root.text.strip_edges() if comfyui_root else ""
+	var comfy_root_found := not comfy_root_text.is_empty() and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(comfy_root_text))
+	_set_status_indicator("comfyui.root", "pass" if comfy_root_found else "fail", "Yes" if comfy_root_found else "No")
+
+	var animation_text := animation_asset.text.strip_edges() if animation_asset else ""
+	if animation_text.is_empty():
+		_set_status_indicator("animation.asset", "unknown", "Not set")
+	else:
+		var animation_found := FileAccess.file_exists(animation_text)
+		_set_status_indicator("animation.asset", "pass" if animation_found else "fail", "Yes" if animation_found else "No")
+
+	var scene_text := example_scene_path.text.strip_edges() if example_scene_path else ""
+	if scene_text.is_empty():
+		_set_status_indicator("example.scene", "unknown", "Not set")
+	else:
+		var scene_found := FileAccess.file_exists(scene_text)
+		_set_status_indicator("example.scene", "pass" if scene_found else "fail", "Yes" if scene_found else "No")
+
+
+func _update_status_indicators_from_report(report: Dictionary, ollama: Dictionary) -> void:
+	_refresh_static_status_indicators()
+	_set_status_indicator("blender.executable", _state_from_report(report, "blender.executable"), _yes_no_from_report(report, "blender.executable"))
+	_set_status_indicator("comfyui.reachable", _state_from_report(report, "comfyui.reachable"), _yes_no_from_report(report, "comfyui.reachable"))
+	_set_status_indicator("comfyui.nodes", _aggregate_state(report, "comfyui.nodes."), _aggregate_label(report, "comfyui.nodes."))
+	_set_status_indicator("comfyui.models", _aggregate_state(report, "comfyui.models."), _aggregate_label(report, "comfyui.models."))
+	_set_status_indicator("ollama.executable", "pass" if bool(ollama.get("found", false)) else "fail", "Yes" if bool(ollama.get("found", false)) else "No")
+	_set_status_indicator("ollama.running", "pass" if bool(ollama.get("running", false)) else "fail", "Yes" if bool(ollama.get("running", false)) else "No")
+
+
+func _state_from_report(report: Dictionary, id: String) -> String:
+	for check in report.get("checks", []):
+		if str(check.get("id", "")) == id:
+			return _indicator_state_for_check(str(check.get("status", "")))
+	return "unknown"
+
+
+func _yes_no_from_report(report: Dictionary, id: String) -> String:
+	for check in report.get("checks", []):
+		if str(check.get("id", "")) == id:
+			return "Yes" if str(check.get("status", "")) == "pass" else "No"
+	return "Unchecked"
+
+
+func _aggregate_state(report: Dictionary, id_prefix: String) -> String:
+	var saw_match := false
+	var saw_warning := false
+	for check in report.get("checks", []):
+		if not str(check.get("id", "")).begins_with(id_prefix):
+			continue
+		saw_match = true
+		var state := _indicator_state_for_check(str(check.get("status", "")))
+		if state == "fail":
+			return "fail"
+		if state != "pass":
+			saw_warning = true
+	if not saw_match:
+		return "unknown"
+	return "warning" if saw_warning else "pass"
+
+
+func _aggregate_label(report: Dictionary, id_prefix: String) -> String:
+	var saw_match := false
+	for check in report.get("checks", []):
+		if not str(check.get("id", "")).begins_with(id_prefix):
+			continue
+		saw_match = true
+		if str(check.get("status", "")) != "pass":
+			return "No"
+	return "Yes" if saw_match else "Unchecked"
+
+
+func _indicator_state_for_check(status_text: String) -> String:
+	match status_text:
+		"pass":
+			return "pass"
+		"fail":
+			return "fail"
+		"warning", "unknown":
+			return "warning"
+		_:
+			return "unknown"
 
 
 func _refresh_characters(selected_id := "") -> void:
@@ -492,6 +661,19 @@ func _open_selected_run_in_comfyui() -> void:
 	OS.shell_open(url)
 
 
+func _open_example_scene() -> void:
+	var path := example_scene_path.text.strip_edges()
+	if path.is_empty():
+		path = DEFAULT_EXAMPLE_SCENE
+	if not FileAccess.file_exists(path):
+		_refresh_static_status_indicators()
+		_set_status("Example scene not found: %s" % path, true)
+		return
+	EditorInterface.open_scene_from_path(path)
+	_refresh_static_status_indicators()
+	_set_status("Opened %s" % path)
+
+
 func _load_configuration() -> void:
 	var settings := EditorInterface.get_editor_settings()
 	var values := Config.resolve({}, settings)
@@ -504,6 +686,7 @@ func _load_configuration() -> void:
 	for key in Config.DEFAULTS:
 		sources.append("%s: %s" % [key, Config.source_of(key, {}, settings)])
 	configuration_status.text = ", ".join(sources)
+	_refresh_static_status_indicators()
 
 
 func _save_configuration(local: bool) -> void:
@@ -537,6 +720,13 @@ func _deep_check_dependencies() -> void:
 
 func _run_environment_check(deep_check: bool) -> void:
 	dependency_status.text = "Checking local environment…"
+	_refresh_static_status_indicators()
+	_set_status_indicator("blender.executable", "unknown", "Checking")
+	_set_status_indicator("comfyui.reachable", "unknown", "Checking")
+	_set_status_indicator("comfyui.nodes", "unknown", "Checking")
+	_set_status_indicator("comfyui.models", "unknown", "Checking")
+	_set_status_indicator("ollama.executable", "unknown", "Checking")
+	_set_status_indicator("ollama.running", "unknown", "Checking")
 	var report: Dictionary = await environment_checker.check("all", {
 		"comfyui_url": comfyui_url.text,
 		"comfyui_root": comfyui_root.text,
@@ -545,8 +735,25 @@ func _run_environment_check(deep_check: bool) -> void:
 		"animation_asset": animation_asset.text,
 		"deep_check": deep_check
 	})
+	var ollama := await _probe_ollama()
 	last_environment_report = report
 	_render_environment_report()
+	_update_status_indicators_from_report(report, ollama)
+
+
+func _probe_ollama() -> Dictionary:
+	var output := []
+	var found := OS.execute("ollama", ["--version"], output, true) == 0
+	var request := HTTPRequest.new()
+	request.timeout = 2.0
+	add_child(request)
+	var start_error := request.request("http://127.0.0.1:11434/api/tags")
+	if start_error != OK:
+		request.queue_free()
+		return {"found": found, "running": false}
+	var response: Array = await request.request_completed
+	request.queue_free()
+	return {"found": found, "running": response[0] == HTTPRequest.RESULT_SUCCESS and response[1] >= 200 and response[1] < 300}
 
 
 func _toggle_technical_details(_enabled: bool) -> void:

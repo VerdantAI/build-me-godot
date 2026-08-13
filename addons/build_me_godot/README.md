@@ -36,6 +36,8 @@ The addon package remains self-contained under `addons/build_me_godot/`. Project
 
 Build Me Godot is driven from the target Godot project. Open the dock, create or select a character, confirm the two rigged mesh inputs, enter character metadata and prompts, then queue a local ComfyUI reference run. Runs are stored as sequential `v1`, `v2`, and later versions in `res://build_me_godot/characters/<character_id>/character.json`.
 
+The setup tab shows colored local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the example scene. The example scene field defaults to `res://scenes/main.tscn`; use **Open example scene** when the consuming project provides that scene for rigged mesh inspection.
+
 After reviewing generated references, approve one completed version and explicitly continue the pipeline. Continuation writes `res://build_me_godot/characters/<character_id>/blender/<version>/reference_inputs.json` for the Blender stage and advances the manifest to `pipeline_enabled`. Final character scenes, animations, and secondary assets are registered back into the same manifest when downstream work completes.
 
 Prompts are project data owned by Godot, not by the ComfyUI editor. You can still tune in ComfyUI: export the workflow JSON, import its prompt fields back into the dock or CLI, save the character draft, then queue from Godot. Queued runs record the ComfyUI `prompt_id` when available and save the configured API workflow snapshot under `res://build_me_godot/characters/<character_id>/workflows/<version>_api.json` for later agent or headless replay.

@@ -64,6 +64,8 @@ The intended loop is:
 6. Explicitly continue the downstream pipeline. This writes `blender/<version>/reference_inputs.json` for Blender automation and advances the manifest stage.
 7. Register the final Godot scene, animations, and secondary assets back into the same character manifest when downstream work completes.
 
+The setup tab shows Godot-style local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the example scene. The example scene field defaults to `res://scenes/main.tscn`; use **Open example scene** when a consuming project provides that scene for rigged mesh inspection.
+
 Headless agents can inspect and apply approved manifest transitions without running external setup or downloads:
 
 ```bash
