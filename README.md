@@ -112,9 +112,22 @@ utils/check-local-requirements.sh apply install.comfyui.helper
 utils/check-local-requirements.sh apply download.models
 utils/check-local-requirements.sh apply move.models
 utils/check-local-requirements.sh apply link.example.addon
+utils/check-local-requirements.sh apply write.container.config
 ```
 
 The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, the companion example-project addon symlink, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, links the example project, pulls Ollama models, or writes config. Mutating `apply` commands explain the planned change and ask for confirmation by default; use `--yes` only after a specific action has already been approved for non-interactive or JSON automation.
+
+The setup helper also reports optional container readiness for an isolated local
+ComfyUI/TripoSR/Blender toolchain. It prefers reusing user-owned model stores by
+mounting existing ComfyUI models, custom nodes, outputs, staged model downloads,
+and Ollama model caches into the container. `apply write.container.config`
+writes a gitignored env file describing those mounts; it does not build, pull,
+or run a container image.
+
+The reviewed local image recipe lives in `containers/local-toolchain/`. It
+exposes `doctor`, `comfyui-server`, `triposr-job`, and `blender-job` modes and
+keeps model weights outside the image. Build and run it only through explicit
+setup actions such as `container.build.local_toolchain` and `container.doctor`.
 
 For the companion example project, `apply link.example.addon` creates only the package-level development symlink: `godot-addons-example-project/addons/build_me_godot -> build-me-godot/addons/build_me_godot`. The setup app verifies that `addons/build_me_godot/plugin.cfg` is visible through the link.
 

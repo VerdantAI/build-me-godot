@@ -7,6 +7,7 @@ Build Me Godot is a local-first Godot 4 editor addon for repeatable AI-assisted 
 ### Features
 
 - Project-owned, versioned character manifests and editable prompts
+- Packaged onboarding base-character scene with two rigged neutral A-pose mannequins
 - Packaged ComfyUI workflow JSON for canonical and consistent multiview images
 - Explicit local ComfyUI queueing with no hosted inference dependency
 - Machine-readable workflow and Blender compatibility declarations
@@ -22,7 +23,7 @@ Build Me Godot is a local-first Godot 4 editor addon for repeatable AI-assisted 
 - Blender 4.2+ for the humanoid builder
 - A separately obtained commercially usable reconstruction provider and animation asset for those stages
 
-The addon does not bundle model weights, Blender, ComfyUI, reconstruction providers, animation libraries, or Gator Model Studio. Enabling it does not download packages, contact hosted inference services, or modify external installations.
+The addon bundles a small CC0 Quaternius onboarding scene with two rigged mannequins and a shared animation library. It does not bundle model weights, Blender, ComfyUI, reconstruction providers, production animation packs, or Gator Model Studio. Enabling it does not download packages, contact hosted inference services, or modify external installations.
 
 Runnable example project: https://github.com/VerdantAI/godot-addons-example-project. The example is a separate consumer project, not part of the addon package.
 

@@ -23,6 +23,11 @@ BUILD_ME_GODOT_OLLAMA_HOST='http://127.0.0.1:11434'
 BUILD_ME_GODOT_OLLAMA_MODELS_DIR='/home/you/.ollama/models'
 BUILD_ME_GODOT_OLLAMA_MODELS='llama3.1:8b'
 
+# Optional container toolchain settings. Container images should mount these
+# existing user-owned model/cache folders instead of baking weights into images.
+BUILD_ME_GODOT_CONTAINER_CONFIG='/home/you/verdant/build-me-godot/utils/check-local-container.local.env'
+BUILD_ME_GODOT_CONTAINER_MODEL_ROOTS='/home/you/src/ComfyUI/models /home/you/Downloads/build-me-godot-models /home/you/.ollama/models'
+
 # ComfyUI model placement guide:
 # text encoders: $BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/
 # diffusion models: $BUILD_ME_GODOT_COMFYUI_ROOT/models/diffusion_models/

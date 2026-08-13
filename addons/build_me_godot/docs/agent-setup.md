@@ -30,3 +30,22 @@ godot --no-header --headless --path . --script res://addons/build_me_godot/cli/e
 Exit code `0` means ready or successfully applied, `1` means required checks are not ready, `2` means invalid invocation or action selection, and `3` means an explicit action or its verification failed. JSON stdout is machine-readable; diagnostics use stderr.
 
 CLI path flags are invocation-local and take precedence over `BUILD_ME_GODOT_*` environment variables, the gitignored `res://build_me_godot.local.cfg`, and global Editor Settings. An agent may read the local file for diagnosis but should change it only when the artist requests project-local configuration. Use the dock's **Save for this project** or copy the packaged example; never edit Godot's global editor settings file directly.
+
+## Field-engineer conformance
+
+After a reference version is completed and approved, agents can prepare the
+non-destructive conformance plan without running external inference:
+
+```sh
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- \
+  prepare-conformance --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- \
+  inspect-conformance --character-id field_engineer --version v1
+```
+
+The plan is written under
+`res://build_me_godot/characters/<character_id>/conformance/<version>/` and
+records source references, rigged meshes, provider provenance,
+field-engineer targets, validation constraints, and changed paths. A manually
+reviewed proxy mesh can be recorded with `--proxy-mesh`, but it remains an
+immutable reference and is not production topology.

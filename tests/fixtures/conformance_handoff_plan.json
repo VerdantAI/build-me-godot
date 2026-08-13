@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "character_id": "field_engineer_fixture",
+  "reference_version": "v1",
+  "status": "conformance_prepared",
+  "pose_contract": "neutral_a_pose_30deg_v1",
+  "source_references": {
+    "front": "res://tests/fixtures/missing_front.png",
+    "right": "res://tests/fixtures/missing_right.png",
+    "back": "res://tests/fixtures/missing_back.png"
+  },
+  "rigged_meshes": {
+    "primary": "res://tests/fixtures/missing_primary.glb",
+    "secondary": "res://tests/fixtures/missing_secondary.glb"
+  },
+  "providers": [
+    {
+      "provider_id": "external_proxy_mesh",
+      "status": "provided",
+      "license_record": "user_supplied",
+      "outputs": {
+        "front_proxy_glb": "res://tests/fixtures/missing_proxy.glb"
+      }
+    }
+  ],
+  "validation_constraints": {
+    "source_meshes_immutable": true,
+    "preserve_skeleton_profile_humanoid": true,
+    "preserve_stable_socket_names": true,
+    "pose_contract": "neutral_a_pose_30deg_v1",
+    "production_topology_from_proxy_allowed": false
+  }
+}

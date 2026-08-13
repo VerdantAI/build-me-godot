@@ -26,7 +26,7 @@ class StatusIndicatorDot:
 
 const DEFAULT_PROMPT := "Full-body game character reference of a practical field engineer and surveyor, sturdy work boots, durable work trousers, canvas work jacket, utility belt, functional realistic clothing construction, neutral A-pose, arms approximately 30 degrees away from the torso, feet shoulder-width apart, neutral expression, straight posture, complete head and feet visible, centered, minimal perspective distortion, approximately orthographic character-development reference, uniform diffuse studio lighting, plain neutral light gray background, clothing seams and construction clearly visible, no props obscuring the body."
 const DEFAULT_NEGATIVE_PROMPT := "cropped head, cropped feet, missing limbs, extra limbs, crossed arms, crossed legs, action pose, contrapposto, foreshortening, wide angle, perspective distortion, dramatic lighting, hard cast shadow, cluttered background, handheld props, text, watermark"
-const DEFAULT_EXAMPLE_SCENE := "res://scenes/base_characters.tscn"
+const DEFAULT_EXAMPLE_SCENE := "res://addons/build_me_godot/examples/base_characters.tscn"
 const INDICATOR_PASS := Color("43a047")
 const INDICATOR_FAIL := Color("d64545")
 const INDICATOR_WARNING := Color("d6a21f")
@@ -151,15 +151,36 @@ func _build_ui() -> void:
 	_add_status_indicator(status_grid, "ollama.running", "Ollama running")
 	_add_status_indicator(status_grid, "animation.asset", "Animation asset")
 	_add_status_indicator(status_grid, "example.scene", "Base character scene")
+	var dependency_actions := HBoxContainer.new()
+	dependency_actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dependency_check_button = Button.new()
 	dependency_check_button.text = "Check dependencies"
+	dependency_check_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dependency_check_button.pressed.connect(_check_dependencies)
-	setup_tab.add_child(dependency_check_button)
+	dependency_actions.add_child(dependency_check_button)
 	deep_check_button = Button.new()
 	deep_check_button.text = "Deep-check Blender"
 	deep_check_button.tooltip_text = "Starts Blender in background mode and verifies the builder operators"
+	deep_check_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	deep_check_button.pressed.connect(_deep_check_dependencies)
-	setup_tab.add_child(deep_check_button)
+	dependency_actions.add_child(deep_check_button)
+	var report_menu := MenuButton.new()
+	report_menu.text = "⋮"
+	report_menu.tooltip_text = "Report actions"
+	report_menu.custom_minimum_size.x = 32
+	report_menu.get_popup().add_item("Copy report", 0)
+	report_menu.get_popup().add_item("Save JSON report", 1)
+	report_menu.get_popup().id_pressed.connect(_environment_report_menu_action)
+	dependency_actions.add_child(report_menu)
+	setup_tab.add_child(dependency_actions)
+	technical_details = CheckButton.new()
+	technical_details.text = "Show technical details"
+	technical_details.toggled.connect(_toggle_technical_details)
+	setup_tab.add_child(technical_details)
+	dependency_status = RichTextLabel.new()
+	dependency_status.fit_content = true
+	dependency_status.custom_minimum_size.y = 55
+	setup_tab.add_child(dependency_status)
 	dependency_spinner = Timer.new()
 	dependency_spinner.wait_time = 0.1
 	dependency_spinner.timeout.connect(_advance_dependency_spinner)
@@ -196,24 +217,6 @@ func _build_ui() -> void:
 	configuration_status = Label.new()
 	configuration_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	setup_tab.add_child(configuration_status)
-	var report_buttons := HBoxContainer.new()
-	var copy_report_button := Button.new()
-	copy_report_button.text = "Copy report"
-	copy_report_button.pressed.connect(_copy_environment_report)
-	report_buttons.add_child(copy_report_button)
-	var save_report_button := Button.new()
-	save_report_button.text = "Save report"
-	save_report_button.pressed.connect(_save_environment_report)
-	report_buttons.add_child(save_report_button)
-	setup_tab.add_child(report_buttons)
-	technical_details = CheckButton.new()
-	technical_details.text = "Show technical details"
-	technical_details.toggled.connect(_toggle_technical_details)
-	setup_tab.add_child(technical_details)
-	dependency_status = RichTextLabel.new()
-	dependency_status.fit_content = true
-	dependency_status.custom_minimum_size.y = 55
-	setup_tab.add_child(dependency_status)
 
 	var generate_tab := _add_tab(tabs, "3 Generate")
 	workflow_import_path = _add_line_edit(generate_tab, "Comfy workflow JSON", "res://addons/build_me_godot/workflows/character_turnaround_open.json")
@@ -359,9 +362,9 @@ func _refresh_static_status_indicators() -> void:
 		_set_status_indicator("example.scene", "unknown", "Not set")
 	else:
 		var scene_found := FileAccess.file_exists(scene_text)
-		_set_status_indicator("example.scene", "pass" if scene_found else "fail", "Yes" if scene_found else "No")
+		_set_status_indicator("example.scene", "pass" if scene_found else "warning", "Yes" if scene_found else "Optional missing")
 		if open_example_scene_button:
-			var edited_root := EditorInterface.get_edited_scene_root()
+			var edited_root := _edited_scene_root()
 			var current_path := edited_root.scene_file_path if edited_root else ""
 			open_example_scene_button.text = "Base character scene loaded" if current_path == scene_text else "Load base character scene"
 
@@ -682,22 +685,27 @@ func _open_example_scene() -> void:
 		path = DEFAULT_EXAMPLE_SCENE
 	if not FileAccess.file_exists(path):
 		_refresh_static_status_indicators()
-		_set_status("Base character scene not found: %s" % path, true)
+		_set_status("Optional base character scene is not present in this project: %s" % path, true)
 		return
-	var edited_root := EditorInterface.get_edited_scene_root()
+	var edited_root := _edited_scene_root()
 	if edited_root and edited_root.scene_file_path == path:
-		EditorInterface.set_main_screen_editor("3D")
+		if EditorInterface.has_method("set_main_screen_editor"):
+			EditorInterface.call("set_main_screen_editor", "3D")
 		_refresh_static_status_indicators()
 		_set_status("Base character scene is already loaded: %s" % path)
 		return
-	EditorInterface.open_scene_from_path(path)
-	EditorInterface.set_main_screen_editor("3D")
+	if not EditorInterface.has_method("open_scene_from_path"):
+		_set_status("Editor scene loading is not available in this context.", true)
+		return
+	EditorInterface.call("open_scene_from_path", path)
+	if EditorInterface.has_method("set_main_screen_editor"):
+		EditorInterface.call("set_main_screen_editor", "3D")
 	_refresh_static_status_indicators()
 	_set_status("Loaded base character scene: %s" % path)
 
 
 func _load_configuration() -> void:
-	var settings := EditorInterface.get_editor_settings()
+	var settings := _editor_settings()
 	var values := Config.resolve({}, settings)
 	comfyui_url.text = str(values[Config.COMFYUI_URL])
 	comfyui_root.text = str(values[Config.COMFYUI_ROOT])
@@ -712,7 +720,7 @@ func _load_configuration() -> void:
 
 
 func _save_configuration(local: bool) -> void:
-	var settings := EditorInterface.get_editor_settings()
+	var settings := _editor_settings()
 	var values := {
 		Config.COMFYUI_URL: comfyui_url.text.strip_edges(),
 		Config.COMFYUI_ROOT: comfyui_root.text.strip_edges(),
@@ -726,10 +734,25 @@ func _save_configuration(local: bool) -> void:
 			_set_status("Could not write %s: %s" % [Config.LOCAL_FILE, error_string(error)], true)
 			return
 	else:
+		if settings == null:
+			_set_status("Editor settings are not available in this context.", true)
+			return
 		for key in values:
 			settings.set_setting(Config.EDITOR_PREFIX + key, values[key])
 	_load_configuration()
 	_set_status("Saved %s configuration." % ("project-local" if local else "global editor"))
+
+
+func _editor_settings() -> Object:
+	if Engine.is_editor_hint() and EditorInterface.has_method("get_editor_settings"):
+		return EditorInterface.call("get_editor_settings")
+	return null
+
+
+func _edited_scene_root() -> Node:
+	if Engine.is_editor_hint() and EditorInterface.has_method("get_edited_scene_root"):
+		return EditorInterface.call("get_edited_scene_root")
+	return null
 
 
 func _check_dependencies() -> void:
@@ -820,6 +843,14 @@ func _copy_environment_report() -> void:
 		return
 	DisplayServer.clipboard_set(JSON.stringify(EnvironmentReport.redact(last_environment_report), "  "))
 	_set_status("Environment report copied as JSON.")
+
+
+func _environment_report_menu_action(id: int) -> void:
+	match id:
+		0:
+			_copy_environment_report()
+		1:
+			_save_environment_report()
 
 
 func _save_environment_report() -> void:

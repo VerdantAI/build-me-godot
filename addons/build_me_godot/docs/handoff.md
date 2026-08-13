@@ -42,10 +42,39 @@ Release validation still needs a normal copied/exported addon install.
 - Run deterministic headless `check`, `plan`, `apply`, and `verify` commands.
 - Probe Blender and the packaged humanoid builder, including an explicit deep check.
 - Use the optional, user-managed TripoSR adapter on the validated ROCm path.
+- Prepare and inspect field-engineer conformance plans from approved image
+  references without running external inference.
 - Preserve the `neutral_a_pose_30deg_v1` rig and socket contract.
 
 AI reconstruction remains an immutable reference mesh. Automatic rigging and
 deformation checks do not establish production-ready topology.
+
+Field-engineer conformance artifacts live under
+`res://build_me_godot/characters/<character_id>/conformance/<version>/`.
+The first implementation records approved references, rigged mesh paths,
+TripoSR/manual proxy provenance, safety-workwear targets, prop socket
+candidates, and validation constraints. Pipeline continuation also emits
+`blender/<version>/mesh_guidance.json` for the generic reference-guidance
+handoff.
+
+After `prepare-conformance`, agents can run `generate-proxy` only when a
+user-managed reconstruction command is configured. The command is expected to
+accept `--input`, `--output`, and `--metadata-output`; it is probed with
+`--version` by the setup app. If no command is configured, the correct stop is
+operator work: configure a reviewed local TripoSR wrapper or manually import a
+reviewed proxy mesh with provenance. The addon must not clone repositories,
+install Python packages, download weights, or write into ComfyUI/Blender during
+this step.
+
+Blender handoff and silhouette overlay generation begin with the packaged
+`integrations/blender/prepare_conformance_handoff.py` command. That command
+loads `conformance_plan.json` or `mesh_guidance.json`, tags approved
+references, source rigged meshes, and AI proxy meshes as
+reference-only/non-exportable, creates duplicate work meshes for editable
+conformance experiments, and writes
+`conformance_handoff_report.json` plus `conformance_guidance.json` with changed
+paths. It also emits front/right/back silhouette overlay JSON reports and SVG
+previews beneath the handoff output `overlays/` directory.
 
 ## Machine configuration
 

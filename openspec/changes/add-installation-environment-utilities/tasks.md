@@ -43,7 +43,7 @@
   technical details, rerun/deep-check controls, and no per-frame warning spam.
 - [x] 4.3 Add copy-text-report and save-JSON-report actions using the same report
   model and redaction behavior as the CLI.
-- [ ] 4.4 Verify keyboard navigation, narrow dock layouts, high-DPI rendering,
+- [x] 4.4 Verify keyboard navigation, narrow dock layouts, high-DPI rendering,
   and status cues that do not depend on color alone.
 
 ## 5. Explicit installation planning and safe actions
@@ -68,5 +68,5 @@
   and deep probes, missing assets, and optional Gator detection.
 - [x] 6.3 Add a clean-project installation test proving the addon can diagnose an
   empty environment without errors or mutations.
-- [ ] 6.4 Update README, packaged setup documentation, attributions, license
+- [x] 6.4 Update README, packaged setup documentation, attributions, license
   review, screenshots, and Godot Asset Store description.

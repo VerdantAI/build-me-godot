@@ -55,6 +55,22 @@ jq -e --arg target "$test_root/comfyui/custom_nodes/character_turnaround_output.
 jq -e '.install_plan.actions[] | select(.id == "install.comfyui.turnaround_helper") | (.rationale | length > 0) and (.prerequisites | length > 0) and (.verification_checks | length > 0) and .reversible and (.license == "MIT")' <<<"$plan_output" >/dev/null
 jq -e '.environment.schema_version == 1 and (.environment.checks | map(.id) == (map(.id) | sort))' <<<"$plan_output" >/dev/null
 
+set +e
+conformance_plan_output=$(godot --no-header --headless --path "$test_root/project" \
+    --script res://addons/build_me_godot/cli/environment_cli.gd -- \
+    plan --capability field_engineer_mesh_conformance --format json)
+conformance_plan_code=$?
+set -e
+[[ "$conformance_plan_code" -eq 1 ]]
+jq -e '.environment.overall_status == "not_ready"' <<<"$conformance_plan_output" >/dev/null
+jq -e '.install_plan.actions | any(.id == "create.project.workspace" and .mode == "safe_local")' <<<"$conformance_plan_output" >/dev/null
+jq -e '.environment.checks | any(.id == "conformance.providers" and .status == "pass")' <<<"$conformance_plan_output" >/dev/null
+jq -e '.environment.checks | any(.id == "conformance.provider.triposr" and .status == "warning" and .importance == "optional")' <<<"$conformance_plan_output" >/dev/null
+jq -e '.environment.checks[] | select(.id == "conformance.provider.triposr") | .evidence.provider_status == "supported_user_managed_command" and .evidence.command_contract.arguments == ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"] and .evidence.command_contract.automatic_downloads_allowed == false' <<<"$conformance_plan_output" >/dev/null
+jq -e '.install_plan.actions[] | select(.id == "install.manual.triposr.provider") | .mode == "manual" and .license.code == "MIT" and .license.weights == "MIT" and .license.commercial_use == true and .command_contract.automatic_downloads_allowed == false' <<<"$conformance_plan_output" >/dev/null
+jq -e '.install_plan.actions[] | select(.id == "write.container.config") | .mode == "manual" and .setup_command == "utils/check-local-requirements.sh apply write.container.config --yes --json" and (.license.notice | contains("mounted"))' <<<"$conformance_plan_output" >/dev/null
+jq -e '.install_plan.actions | all(.id != "download.triposr.models" and .id != "download.flowty.triposr.node")' <<<"$conformance_plan_output" >/dev/null
+
 support_output=$(godot --no-header --headless --path "$test_root/project" \
     --script res://addons/build_me_godot/cli/environment_cli.gd -- \
     check --capability blender_humanoid_build --format json \

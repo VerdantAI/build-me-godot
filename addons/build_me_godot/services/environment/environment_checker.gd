@@ -9,7 +9,7 @@ const ComfyUIProvider = preload("res://addons/build_me_godot/services/environmen
 const CAPABILITIES := [
 	"project_workspace", "canonical_generation", "multiview_generation",
 	"reconstruction", "blender_humanoid_build", "godot_character_import",
-	"last_mile_refinement", "all"
+	"last_mile_refinement", "field_engineer_mesh_conformance", "all"
 ]
 
 

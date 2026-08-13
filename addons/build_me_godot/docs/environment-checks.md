@@ -18,6 +18,7 @@ godot --no-header --headless --path /path/to/project \
 - `canonical_generation`
 - `multiview_generation`
 - `reconstruction`
+- `field_engineer_mesh_conformance`
 - `blender_humanoid_build`
 - `godot_character_import`
 - `last_mile_refinement`
@@ -66,7 +67,25 @@ Open the Build Me Godot dock, configure the local ComfyUI URL and Blender execut
 
 The addon itself is installed and enabled per project. Machine-specific ComfyUI, Blender, reconstruction, and animation-library locations can be saved globally with **Save for me** or in the gitignored project-local configuration with **Save for this project**. Character prompts, workflow selections, and generated-asset records remain versioned project data under `res://build_me_godot/`.
 
-Missing Gator Model Studio is optional and does not block image generation. Missing reconstruction or animation configuration remains an explicit unknown requirement for the stages that need it.
+Missing Gator Model Studio is optional and does not block image generation.
+Missing reconstruction or animation configuration remains an explicit unknown
+requirement for the stages that need it.
+
+`field_engineer_mesh_conformance` checks the packaged conformance provider
+declaration and the optional TripoSR proxy-reconstruction configuration.
+TripoSR is managed as a user-installed local provider. Because ComfyUI is
+already part of the stack, the preferred local path is the external
+`flowtyone/ComfyUI-Flowty-TripoSR` node when it is already installed or
+provided by the local container toolchain. `check` and `plan` report its
+GPL-3.0 license record, native custom-node presence, TripoSR checkpoint
+presence, and verification checks. The Godot addon does not clone repositories,
+install Python packages, download weights, copy checkpoints, install ComfyUI
+custom nodes, or mutate Blender. The repository setup utility can write a
+container config that mounts existing user-owned model/cache folders; it no
+longer offers Flowty or TripoSR model download/install actions. Any future
+promoted model, custom node, LoRA, adapter, or provider must add the same
+install-app detection, planning, explicit apply/manual action, changed-path
+reporting, and verification before it is exposed as supported.
 
 ## Privacy
 

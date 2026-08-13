@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "capability": "field_engineer_mesh_conformance",
+  "providers": [
+    {
+      "provider_id": "triposr",
+      "role": "proxy_reconstruction",
+      "status": "supported_user_managed_command",
+      "requirements_path": "res://addons/build_me_godot/integrations/reconstruction/triposr/triposr.requirements.json",
+      "license_record": "TripoSR",
+      "commercial_use": true,
+      "input_formats": ["png", "jpg", "jpeg", "webp"],
+      "output_formats": ["glb", "json"],
+      "expected_command_probe": "--version",
+      "expected_command_args": ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"],
+      "vram_class": "low",
+      "automatic_downloads_allowed": false,
+      "manual_setup": "Install TripoSR and its weights independently, wrap it with the Build Me Godot command contract, then configure BUILD_ME_GODOT_RECONSTRUCTION_COMMAND or reconstruction_command in build_me_godot.local.cfg."
+    },
+    {
+      "provider_id": "container_triposr",
+      "role": "proxy_reconstruction",
+      "status": "supported_user_built_container",
+      "requirements_path": "res://addons/build_me_godot/integrations/reconstruction/triposr/triposr.requirements.json",
+      "license_record": "TripoSR",
+      "commercial_use": true,
+      "input_formats": ["png", "jpg", "jpeg", "webp"],
+      "output_formats": ["glb", "json"],
+      "expected_command_probe": "--version",
+      "expected_command_args": ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"],
+      "vram_class": "low",
+      "automatic_downloads_allowed": false,
+      "manual_setup": "Run `./utils/check-local-requirements.sh apply write.container.config --yes`, then explicitly build the reviewed local toolchain image with `./utils/check-local-requirements.sh apply container.build.local_toolchain --yes`. Configure reconstruction_command to `bash utils/run-container-triposr.sh` so the provider reuses mounted user-owned TripoSR model files."
+    },
+    {
+      "provider_id": "external_proxy_mesh",
+      "role": "manual_proxy_import",
+      "status": "supported_manual",
+      "license_record": "user_supplied",
+      "commercial_use": "user_review_required",
+      "input_formats": ["glb", "gltf", "obj"],
+      "output_formats": ["glb", "gltf", "obj"],
+      "automatic_downloads_allowed": false,
+      "manual_setup": "Place user-reviewed proxy meshes under the character conformance folder and record provenance when preparing conformance."
+    },
+    {
+      "provider_id": "comfyui_flowty_triposr",
+      "role": "comfyui_local_proxy_reconstruction",
+      "status": "supported_external_node",
+      "repository": "flowtyone/ComfyUI-Flowty-TripoSR",
+      "license_record": "ComfyUI-Flowty-TripoSR",
+      "commercial_use": true,
+      "required_node_classes": ["TripoSRModelLoader", "TripoSRSampler", "TripoSRViewer"],
+      "input_formats": ["png", "jpg", "jpeg", "webp"],
+      "output_formats": ["obj"],
+      "model_location": "ComfyUI/models/checkpoints/model.ckpt",
+      "automatic_downloads_allowed": false,
+      "manual_setup": "Use the setup app to explicitly stage the GPL-3.0 node archive and reviewed MIT TripoSR checkpoint, then install node requirements manually in the user-managed ComfyUI Python environment."
+    },
+    {
+      "provider_id": "triposg",
+      "role": "candidate_proxy_reconstruction",
+      "status": "blocked_by_license_policy",
+      "license_record": "TripoSG",
+      "reviewed_at": "2026-08-13",
+      "review_notes": "Top-level repository is MIT, but the upstream NOTICE names BRIA RMBG-1.4, Tencent HunyuanDiT, and Tencent FlashVDM terms. Upstream scripts auto-download weights and require at least 8GB VRAM.",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "trellis",
+      "role": "candidate_proxy_reconstruction",
+      "status": "candidate_reviewed_not_promoted",
+      "license_record": "TRELLIS",
+      "reviewed_at": "2026-08-13",
+      "review_notes": "MIT repo/model posture, GLB mesh export available, but setup requires Linux, NVIDIA GPU with at least 16GB VRAM, CUDA, and compiled submodules with separate verification.",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "instantmesh",
+      "role": "candidate_proxy_reconstruction",
+      "status": "candidate_reviewed_not_promoted",
+      "license_record": "InstantMesh",
+      "reviewed_at": "2026-08-13",
+      "review_notes": "Apache-2.0 repo/model card, OBJ default and optional texture-map export. Scripts auto-download models into ckpts and depend on Zero123++ lineage, rembg, CUDA/PyTorch stack.",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "wonder3d",
+      "role": "candidate_multiview_normal_reference",
+      "status": "blocked_by_license_policy",
+      "license_record": "Wonder3D",
+      "reviewed_at": "2026-08-13",
+      "review_notes": "MIT repository, but the referenced wonder3d-v1.0 checkpoint is listed as AGPL-3.0. Keep only as best-practice reference technique.",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "mv_adapter",
+      "role": "candidate_multiview_texture_guidance",
+      "status": "candidate_reviewed_not_promoted",
+      "license_record": "MV-Adapter",
+      "reviewed_at": "2026-08-13",
+      "review_notes": "Apache-2.0 repo and ComfyUI nodes. Adapter, LoRA, and base-model artifacts need independent review; ComfyUI path auto-downloads Hugging Face weights and SDXL workflows need roughly 13-14GB VRAM.",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "stable_fast_3d",
+      "role": "rejected_default_dependency",
+      "status": "rejected_policy",
+      "license_record": "Stable Fast 3D",
+      "automatic_downloads_allowed": false
+    },
+    {
+      "provider_id": "hunyuan3d_2",
+      "role": "rejected_default_dependency",
+      "status": "rejected_policy",
+      "license_record": "Hunyuan3D 2.x",
+      "automatic_downloads_allowed": false
+    }
+  ]
+}

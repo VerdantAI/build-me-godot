@@ -34,6 +34,9 @@ func check(capability: String) -> Array[Dictionary]:
 	if capability in ["all", "multiview_generation"]:
 		checks.append(_packaged_file("workflow.template.multiview", "multiview_generation", "res://addons/build_me_godot/workflows/multiview_only_api.json"))
 		checks.append(_packaged_file("workflow.requirements.multiview", "multiview_generation", "res://addons/build_me_godot/workflows/multiview_only_api.requirements.json"))
+	if capability in ["all", "field_engineer_mesh_conformance"]:
+		checks.append(_packaged_file("conformance.providers", "field_engineer_mesh_conformance", "res://addons/build_me_godot/integrations/reconstruction/conformance_providers.json"))
+		checks.append(_packaged_file("conformance.requirements.triposr", "field_engineer_mesh_conformance", "res://addons/build_me_godot/integrations/reconstruction/triposr/triposr.requirements.json"))
 	return checks
 
 

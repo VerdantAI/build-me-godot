@@ -27,6 +27,11 @@ utils/check-local-requirements.sh apply write.local.config --yes --json
 utils/check-local-requirements.sh apply install.comfyui.helper --yes --json
 utils/check-local-requirements.sh apply download.models --yes --json
 utils/check-local-requirements.sh apply move.models --yes --json
+utils/check-local-requirements.sh apply write.container.config --yes --json
+utils/check-local-requirements.sh apply container.build.local_toolchain --yes --json
+utils/check-local-requirements.sh apply container.doctor --yes --json
+utils/check-local-requirements.sh apply container.start.comfyui --yes --json
+utils/check-local-requirements.sh apply container.stop.comfyui --yes --json
 utils/check-local-requirements.sh apply link.example.addon --yes --json
 utils/check-local-requirements.sh apply start.comfyui --yes --json
 utils/check-local-requirements.sh apply stop.comfyui --yes --json
@@ -38,10 +43,38 @@ utils/check-local-requirements.sh apply stop.blender --yes --json
 
 Do not run `apply` actions unless the user has approved the specific action ID.
 Without `--yes`, interactive `setup` and `apply` commands show the planned file
-operation and ask before proceeding. Model downloads are staged first; moving
-them into ComfyUI is a separate action. Terminal downloads show a progress bar;
-`--json` keeps progress output silent for agents. Incomplete downloads use a
-`.part` suffix and are removed after cancellation or failure.
+operation and ask before proceeding. ComfyUI model downloads are staged first;
+moving them into ComfyUI is a separate action. Terminal downloads show a
+progress bar; `--json` keeps progress output silent for agents. Incomplete
+downloads use a `.part` suffix and are removed after cancellation or failure.
+
+For local ComfyUI TripoSR, the setup app detects an already installed external
+`flowtyone/ComfyUI-Flowty-TripoSR` custom node and local TripoSR checkpoint,
+but it no longer downloads or installs those reconstruction runtime pieces.
+The container toolchain is expected to provide runtime dependencies, while
+model weights are reused from user-owned mounted folders.
+
+Containerized local toolchains are optional. The setup app detects Podman,
+Docker, or Apptainer, checks for NVIDIA CDI GPU wiring when an NVIDIA GPU is
+present, and can write `utils/check-local-container.local.env` with the
+existing model, custom node, output, and cache folders that should be mounted
+into a future ComfyUI/TripoSR/Blender container. Model weights stay in
+user-owned host directories; Build Me Godot does not bake them into container
+images. Building or running the image remains a separate explicit action after
+the image recipe has been reviewed. The recipe is in
+`containers/local-toolchain/` and exposes `doctor`, `comfyui-server`,
+`triposr-job`, and `blender-job` modes.
+
+Use `utils/run-container-triposr.sh` as a reconstruction provider command after
+the image is built. It implements `--version`, `--input`, `--output`, and
+`--metadata-output`, and calls the containerized `triposr-job` without changing
+the provider contract.
+
+When an NVIDIA GPU is visible but no CDI spec is detected, setup reports
+`container.gpu.nvidia_cdi` as a warning and exposes
+`manual.configure.nvidia.cdi`. That action prints operator commands for
+generating/listing NVIDIA CDI specs and smoke-testing Podman GPU access; it
+does not install NVIDIA Container Toolkit or edit system files itself.
 
 Start actions launch the configured application in the background and write a
 PID record and log beneath the user's runtime directory (or `/tmp`). Matching
@@ -51,7 +84,10 @@ process.
 
 Human output includes review sections for missing ComfyUI custom node classes
 and model downloads. Model reviews include the declared license, source
-repository, download URL, staging path, and target ComfyUI model directory.
+repository, download URL, staging path, and target ComfyUI model directory
+when applicable. TripoSR reviews include the exact Hugging Face revision and
+expected local paths for `config.yaml` and `model.ckpt`, but no setup action is
+offered to download or place those files.
 If the Build Me Godot helper file exists but ComfyUI has not loaded its node
 classes, setup offers `refresh.comfyui.helper`; restart ComfyUI after running
 that action.

@@ -1,0 +1,60 @@
+# Build Me Godot local generation toolchain.
+#
+# This recipe installs runtime source and Python dependencies, but it does not
+# copy model weights, generated references, prompts, or project outputs into
+# the image. Mount user-owned model/cache folders at run time.
+#
+# TripoSR dependencies include native CUDA/PyTorch extension wheels such as
+# torchmcubes, so the image needs CUDA headers and nvcc during build.
+FROM docker.io/nvidia/cuda:12.9.0-devel-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG COMFYUI_REF=master
+ARG TRIPOSR_REF=107cefdc244c39106fa830359024f6a2f1c78871
+
+ENV BUILD_ME_GODOT_TOOLCHAIN=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    COMFYUI_ROOT=/opt/ComfyUI \
+    COMFYUI_PYTHON=/opt/build-me-godot-comfyui-venv/bin/python3 \
+    TRIPOSR_ROOT=/opt/TripoSR \
+    TRIPOSR_PYTHON=/opt/build-me-godot-triposr-venv/bin/python3 \
+    BUILD_ME_GODOT_PROJECT_ROOT=/workspace/project
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        blender \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libglib2.0-0 \
+        libgl1 \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${COMFYUI_REF}" https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI \
+    && git clone https://github.com/VAST-AI-Research/TripoSR.git /opt/TripoSR \
+    && cd /opt/TripoSR \
+    && git checkout "${TRIPOSR_REF}" \
+    && python3 -m venv /opt/build-me-godot-comfyui-venv \
+    && /opt/build-me-godot-comfyui-venv/bin/pip install --upgrade pip wheel setuptools \
+    && /opt/build-me-godot-comfyui-venv/bin/pip install -r /opt/ComfyUI/requirements.txt \
+    && python3 -m venv /opt/build-me-godot-triposr-venv \
+    && /opt/build-me-godot-triposr-venv/bin/pip install --upgrade pip wheel setuptools \
+    && /opt/build-me-godot-triposr-venv/bin/pip install torch \
+    && grep -v -E '^(gradio|gradio[<=>[:space:]])' /opt/TripoSR/requirements.txt > /tmp/triposr-runtime-requirements.txt \
+    && CMAKE_PREFIX_PATH=$(/opt/build-me-godot-triposr-venv/bin/python3 -c 'import torch.utils; print(torch.utils.cmake_prefix_path)') /opt/build-me-godot-triposr-venv/bin/pip install -r /tmp/triposr-runtime-requirements.txt \
+    && /opt/build-me-godot-triposr-venv/bin/pip install "numpy<2" onnxruntime pillow scipy trimesh
+
+ENV PATH=/opt/build-me-godot-comfyui-venv/bin:$PATH
+
+COPY bin/ /opt/build-me-godot/bin/
+RUN chmod +x /opt/build-me-godot/bin/entrypoint.sh
+
+WORKDIR /workspace/project
+ENTRYPOINT ["/opt/build-me-godot/bin/entrypoint.sh"]
+CMD ["doctor"]

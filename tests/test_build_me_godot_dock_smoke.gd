@@ -3,6 +3,8 @@ extends SceneTree
 const CharacterStore = preload("res://addons/build_me_godot/core/character_store.gd")
 const BuildMeGodotDock = preload("res://addons/build_me_godot/ui/build_me_godot_dock.gd")
 
+const BASE_CHARACTER_SCENE := "res://addons/build_me_godot/examples/base_characters.tscn"
+
 
 func _init() -> void:
 	call_deferred("_run")
@@ -17,9 +19,12 @@ func _run() -> void:
 	await process_frame
 	if not _check(dock.prompt.text.contains("neutral A-pose"), "dock default prompt was not populated"): return
 	if not _check(dock.negative_prompt.text.contains("cropped head"), "dock default negative prompt was not populated"): return
-	if not _check(dock.example_scene_path.text == "res://scenes/base_characters.tscn", "dock default base character scene was not populated"): return
+	if not _check(dock.example_scene_path.text == BASE_CHARACTER_SCENE, "dock default base character scene was not populated"): return
 	if not _check(dock.status_indicators.has("comfyui.reachable"), "dock did not create the ComfyUI running indicator"): return
 	if not _check(dock.status_indicators.has("ollama.running"), "dock did not create the Ollama running indicator"): return
+	if not _check(dock.status_indicators["example.scene"].value.text == "Yes", "packaged base scene should be available"): return
+	if not _check(_base_character_scene_has_rigged_mannequins(), "packaged base scene should contain two rigged mannequins with animations"): return
+	if not _check(_has_menu_item_text(dock, "Save JSON report"), "dock setup did not expose a Save JSON report action"): return
 	dock._begin_dependency_check(false)
 	if not _check(dock.dependency_check_button.disabled, "dependency button was not disabled while checking"): return
 	if not _check(dock.status_indicators["comfyui.nodes"].value.text.contains("Checking"), "ComfyUI node status did not show the spinner state"): return
@@ -86,4 +91,67 @@ func _check(condition: bool, message: String) -> bool:
 		return true
 	push_error(message)
 	quit(1)
+	return false
+
+
+func _has_button_text(node: Node, text: String) -> bool:
+	if node is Button and node.text == text:
+		return true
+	for child in node.get_children():
+		if _has_button_text(child, text):
+			return true
+	return false
+
+
+func _has_menu_item_text(node: Node, text: String) -> bool:
+	if node is MenuButton:
+		var popup: PopupMenu = node.get_popup()
+		for index in popup.item_count:
+			if popup.get_item_text(index) == text:
+				return true
+	for child in node.get_children():
+		if _has_menu_item_text(child, text):
+			return true
+	return false
+
+
+func _base_character_scene_has_rigged_mannequins() -> bool:
+	var scene := load(BASE_CHARACTER_SCENE)
+	if not scene is PackedScene:
+		return false
+	var instance: Node = scene.instantiate()
+	get_root().add_child(instance)
+	var primary := instance.get_node_or_null("PrimaryRiggedMesh")
+	var secondary := instance.get_node_or_null("SecondaryRiggedMesh")
+	var ok := (
+		_mannequin_has_rig_and_animations(primary)
+		and _mannequin_has_rig_and_animations(secondary)
+	)
+	instance.queue_free()
+	return ok
+
+
+func _mannequin_has_rig_and_animations(node: Node) -> bool:
+	return (
+		node != null
+		and _has_descendant_class(node, "Skeleton3D")
+		and _has_animation_library(node)
+	)
+
+
+func _has_descendant_class(node: Node, expected_class: String) -> bool:
+	if node.is_class(expected_class):
+		return true
+	for child in node.get_children():
+		if _has_descendant_class(child, expected_class):
+			return true
+	return false
+
+
+func _has_animation_library(node: Node) -> bool:
+	if node is AnimationPlayer and not node.get_animation_library_list().is_empty():
+		return true
+	for child in node.get_children():
+		if _has_animation_library(child):
+			return true
 	return false

@@ -31,6 +31,17 @@ func _init() -> void:
 	if not _check(loaded.manifest.future_field.preserve, "unknown manifest fields were not preserved"): return
 	if not _check(loaded.manifest.display_name == "Test Character", "existing manifest fields were not preserved"): return
 	if not _check(store.list_characters() == PackedStringArray(["test_character"]), "character listing failed"): return
+	var source_mesh_dir := test_root.path_join("source_meshes")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(source_mesh_dir))
+	var primary_source_mesh := source_mesh_dir.path_join("base_primary.glb")
+	var secondary_source_mesh := source_mesh_dir.path_join("base_secondary.glb")
+	_write_text(primary_source_mesh, "primary mesh bytes")
+	_write_text(secondary_source_mesh, "secondary mesh bytes")
+	var source_rig_contract := {
+		"profile": "SkeletonProfileHumanoid",
+		"stable_bone_names": ["Hips", "Spine", "Chest", "Neck", "Head", "LeftHand", "RightHand"],
+		"socket_names": ["head", "hand_l", "hand_r", "chest", "hips"]
+	}
 	var draft := store.save_draft({
 		"character_id": "Draft Character",
 		"display_name": "Draft Character",
@@ -43,9 +54,10 @@ func _init() -> void:
 		"negative_prompt": "negative draft prompt",
 		"animation_asset": "res://animations/shared_library.glb",
 		"rigged_meshes": {
-			"primary": "res://characters/base_primary.glb",
-			"secondary": "res://characters/base_secondary.glb"
-		}
+			"primary": primary_source_mesh,
+			"secondary": secondary_source_mesh
+		},
+		"source_rig_contract": source_rig_contract
 	})
 	if not _check(draft.ok, draft.get("error", "draft save failed")): return
 	if not _check(draft.manifest.stage == "draft", "draft stage was not set"): return
@@ -53,8 +65,9 @@ func _init() -> void:
 	if not _check(draft.manifest.project_context.animation_library == "res://animations/shared_library.glb", "project animation library was not recorded"): return
 	if not _check(draft.manifest.metadata.role == "test role", "metadata role did not round-trip"): return
 	if not _check(draft.manifest.metadata.style == "test style", "metadata style did not round-trip"): return
-	if not _check(draft.manifest.rigged_meshes.primary == "res://characters/base_primary.glb", "primary rigged mesh did not round-trip"): return
-	if not _check(draft.manifest.rigged_meshes.secondary == "res://characters/base_secondary.glb", "secondary rigged mesh did not round-trip"): return
+	if not _check(draft.manifest.rigged_meshes.primary == primary_source_mesh, "primary rigged mesh did not round-trip"): return
+	if not _check(draft.manifest.rigged_meshes.secondary == secondary_source_mesh, "secondary rigged mesh did not round-trip"): return
+	if not _check(draft.manifest.source_rig_contract == source_rig_contract, "source rig contract did not round-trip"): return
 	if not _check(draft.manifest.generation.runs.is_empty(), "draft should not create generation runs"): return
 	var validation_errors := store.validate_draft({
 		"character_id": "Invalid/Name",
@@ -132,6 +145,113 @@ func _init() -> void:
 	if not _check(resaved_draft.manifest.stage == "reference_approved", "draft resave regressed stage"): return
 	var missing_version := store.approve_generation_version("draft_character", "v99")
 	if not _check(not missing_version.ok, "missing version approval should fail"): return
+	var unapproved_conformance := store.prepare_conformance("test_character", {"version": "v1"})
+	if not _check(not unapproved_conformance.ok, "conformance should require an approved reference"): return
+	var rigged_before: Dictionary = draft.manifest.rigged_meshes.duplicate(true)
+	var source_rig_contract_before: Dictionary = draft.manifest.source_rig_contract.duplicate(true)
+	var primary_mesh_before := _read_text(primary_source_mesh)
+	var secondary_mesh_before := _read_text(secondary_source_mesh)
+	var bad_pose := store.save_character({
+		"character_id": "draft_character",
+		"pose_contract": "custom_pose",
+		"metadata": {"pose_contract": "custom_pose"}
+	})
+	if not _check(bad_pose.ok, bad_pose.get("error", "bad pose setup failed")): return
+	var bad_pose_conformance := store.prepare_conformance("draft_character", {"version": "v2"})
+	if not _check(not bad_pose_conformance.ok and str(bad_pose_conformance.error).contains("neutral_a_pose_30deg_v1"), "conformance should reject pose contract drift"): return
+	var restored_pose := store.save_character({
+		"character_id": "draft_character",
+		"pose_contract": "neutral_a_pose_30deg_v1",
+		"metadata": {"pose_contract": "neutral_a_pose_30deg_v1"}
+	})
+	if not _check(restored_pose.ok, restored_pose.get("error", "pose restore failed")): return
+	var missing_proxy_license := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"proxy_meshes": {"front_proxy": "res://build_me_godot/characters/draft_character/conformance/v2/proxy_meshes/front_proxy.glb"},
+		"proxy_provenance": {"source": "test"}
+	})
+	if not _check(not missing_proxy_license.ok and str(missing_proxy_license.error).contains("proxy-license-record"), "manual proxy should require a license record"): return
+	var missing_proxy_provenance := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"proxy_meshes": {"front_proxy": "res://build_me_godot/characters/draft_character/conformance/v2/proxy_meshes/front_proxy.glb"},
+		"proxy_license_record": "user_supplied"
+	})
+	if not _check(not missing_proxy_provenance.ok and str(missing_proxy_provenance.error).contains("proxy-provenance"), "manual proxy should require provenance"): return
+	var invalid_proxy_extension := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"proxy_meshes": {"front_proxy": "res://build_me_godot/characters/draft_character/conformance/v2/proxy_meshes/front_proxy.txt"},
+		"proxy_license_record": "user_supplied",
+		"proxy_provenance": {"source": "test"}
+	})
+	if not _check(not invalid_proxy_extension.ok and str(invalid_proxy_extension.error).contains(".glb"), "manual proxy should reject unsupported extensions"): return
+	var addon_proxy_path := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"proxy_meshes": {"front_proxy": "res://addons/build_me_godot/proxy.glb"},
+		"proxy_license_record": "user_supplied",
+		"proxy_provenance": {"source": "test"}
+	})
+	if not _check(not addon_proxy_path.ok and str(addon_proxy_path.error).contains("addon"), "manual proxy should reject addon paths"): return
+	var rejected_provider := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"provider_id": "stable_fast_3d"
+	})
+	if not _check(not rejected_provider.ok and str(rejected_provider.error).contains("Rejected"), "rejected provider should not prepare conformance"): return
+	var missing_proxy_command_plan := store.prepare_conformance("draft_character", {"version": "v2"})
+	if not _check(missing_proxy_command_plan.ok, missing_proxy_command_plan.get("error", "conformance without provider command should prepare")): return
+	if not _check(missing_proxy_command_plan.conformance_plan.providers[0].status == "manual_setup_required", "missing provider command should be recorded as manual setup required"): return
+	var missing_proxy_command := store.generate_proxy("draft_character", {"version": "v2", "provider_id": "triposr"})
+	if not _check(not missing_proxy_command.ok and str(missing_proxy_command.error).contains("No reconstruction command"), "proxy generation should require configured command"): return
+	if not _check(missing_proxy_command.changed_paths[0].ends_with("triposr_front_proxy_generation.json"), "failed proxy attempt report path was not returned"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/conformance/v2/reports/triposr_front_proxy_generation.json")), "failed proxy attempt report was not written"): return
+	var conformance := store.prepare_conformance("draft_character", {
+		"version": "v2",
+		"proxy_meshes": {
+			"front_proxy": "res://build_me_godot/characters/draft_character/conformance/v2/proxy_meshes/front_proxy.glb"
+		},
+		"proxy_license_record": "user_supplied",
+		"proxy_provenance": {"source": "unit-test"}
+	})
+	if not _check(conformance.ok, conformance.get("error", "conformance preparation failed")): return
+	if not _check(conformance.manifest.stage == "conformance_prepared", "conformance stage was not recorded"): return
+	if not _check(conformance.manifest.conformance.plan_path.ends_with("conformance/v2/conformance_plan.json"), "conformance plan path was not recorded"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/conformance/v2/conformance_plan.json")), "conformance plan was not written"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/conformance/v2/provider_inputs.json")), "provider inputs were not written"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/conformance/v2/reports/validation.json")), "validation report was not written"): return
+	if not _check(conformance.conformance_plan.validation_constraints.source_meshes_immutable, "immutable mesh constraint was not recorded"): return
+	if not _check(conformance.conformance_plan.field_engineer_targets.avoid.has("fused_tools"), "avoidance targets were not recorded"): return
+	if not _check(conformance.conformance_plan.providers.size() == 2, "manual proxy provider provenance was not recorded"): return
+	if not _check(conformance.changed_paths.has(test_root.path_join("characters/draft_character/conformance/v2/conformance_plan.json")), "conformance changed path was not reported"): return
+	if not _check(conformance.manifest.rigged_meshes == rigged_before, "conformance preparation changed rigged mesh slots"): return
+	if not _check(conformance.manifest.source_rig_contract == source_rig_contract_before, "conformance preparation changed source rig metadata"): return
+	if not _check(_read_text(primary_source_mesh) == primary_mesh_before, "conformance preparation changed primary source mesh file"): return
+	if not _check(_read_text(secondary_source_mesh) == secondary_mesh_before, "conformance preparation changed secondary source mesh file"): return
+	if not _check(conformance.conformance_plan.validation_constraints.preserve_skeleton_profile_humanoid, "SkeletonProfileHumanoid validation constraint was not recorded"): return
+	if not _check(conformance.conformance_plan.validation_constraints.preserve_stable_socket_names, "stable socket validation constraint was not recorded"): return
+	var conformance_inspection := store.inspect_conformance("draft_character", "v2")
+	if not _check(conformance_inspection.ok, conformance_inspection.get("error", "conformance inspect failed")): return
+	if not _check(conformance_inspection.conformance_plan.reference_version == "v2", "conformance inspect did not load plan"): return
+	var conformance_approval := store.approve_conformance("draft_character", {"version": "v2"})
+	if not _check(conformance_approval.ok, conformance_approval.get("error", "conformance approval failed")): return
+	if not _check(conformance_approval.manifest.stage == "conformance_approved", "conformance approval stage was not recorded"): return
+	if not _check(conformance_approval.manifest.conformance.approved, "conformance approval flag was not recorded"): return
+	var missing_conformance_approval := store.approve_conformance("draft_character", {"version": "v99"})
+	if not _check(not missing_conformance_approval.ok, "missing conformance approval should fail"): return
+	var plan_path := test_root.path_join("characters/draft_character/conformance/v2/conformance_plan.json")
+	var plan_file := FileAccess.open(plan_path, FileAccess.READ)
+	if not _check(plan_file != null, "conformance plan could not be opened for negative approval test"): return
+	var saved_plan = JSON.parse_string(plan_file.get_as_text())
+	saved_plan["providers"] = []
+	var write_plan := FileAccess.open(plan_path, FileAccess.WRITE)
+	write_plan.store_string(JSON.stringify(saved_plan, "  ") + "\n")
+	write_plan.close()
+	var empty_provider_approval := store.approve_conformance("draft_character", {"version": "v2"})
+	if not _check(not empty_provider_approval.ok and str(empty_provider_approval.error).contains("provider provenance"), "empty provider list should block conformance approval"): return
+	saved_plan["providers"] = [{"provider_id": "hunyuan3d_2"}]
+	write_plan = FileAccess.open(plan_path, FileAccess.WRITE)
+	write_plan.store_string(JSON.stringify(saved_plan, "  ") + "\n")
+	write_plan.close()
+	var rejected_provider_approval := store.approve_conformance("draft_character", {"version": "v2"})
+	if not _check(not rejected_provider_approval.ok and str(rejected_provider_approval.error).contains("Rejected"), "rejected provider should block conformance approval"): return
 	var blocked_continue := store.continue_pipeline("draft_character", {"version": "v2"})
 	if not _check(not blocked_continue.ok, "continuation should require warning acknowledgement"): return
 	var continued := store.continue_pipeline("draft_character", {"version": "v2", "warnings_acknowledged": true})
@@ -140,7 +260,12 @@ func _init() -> void:
 	if not _check(continued.manifest.pipeline.approved_version == "v2", "pipeline approved version was not recorded"): return
 	if not _check(continued.manifest.pipeline.readiness_warnings.size() == 1, "pipeline readiness warnings were not recorded"): return
 	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/blender/v2/reference_inputs.json")), "Blender reference input was not written"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/blender/v2/mesh_guidance.json")), "mesh guidance was not written"): return
 	if not _check(continued.changed_paths.has(test_root.path_join("characters/draft_character/blender/v2/reference_inputs.json")), "Blender reference input changed path was not reported"): return
+	if not _check(continued.changed_paths.has(test_root.path_join("characters/draft_character/blender/v2/mesh_guidance.json")), "mesh guidance changed path was not reported"): return
+	if not _check(continued.manifest.pipeline.mesh_guidance_path.ends_with("blender/v2/mesh_guidance.json"), "mesh guidance path was not recorded"): return
+	if not _check(continued.mesh_guidance.validation_constraints.source_meshes_immutable, "mesh guidance immutable-source constraint was not recorded"): return
+	if not _check(continued.mesh_guidance.secondary_asset_candidates[0].socket == "hand_l", "mesh guidance secondary asset socket was not recorded"): return
 	var final_assets := store.register_final_assets("draft_character", {
 		"character_scene": "res://build_me_godot/characters/draft_character/draft_character.tscn",
 		"animations": ["res://build_me_godot/characters/draft_character/animations/idle.res"],
@@ -204,6 +329,20 @@ func _init() -> void:
 		builder_config[field] = null
 	builder_config.pose_contract = builder.metadata.pose_contract
 	if not _check(BlenderRequirements.validate_config(builder_config, builder.metadata).is_empty(), "Blender configuration contract did not validate"): return
+	var handoff_requirements_file := FileAccess.open("res://addons/build_me_godot/integrations/blender/prepare_conformance_handoff.requirements.json", FileAccess.READ)
+	if not _check(handoff_requirements_file != null, "conformance handoff requirements could not be opened"): return
+	var handoff_requirements = JSON.parse_string(handoff_requirements_file.get_as_text())
+	if not _check(handoff_requirements is Dictionary and handoff_requirements.pose_contract == "neutral_a_pose_30deg_v1", "conformance handoff requirements are malformed"): return
+	if not _check(handoff_requirements.configuration.optional.has("mesh_guidance"), "conformance handoff must accept mesh guidance input"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("changed_paths"), "conformance handoff report must declare changed paths"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("alignment"), "conformance handoff report must declare alignment metadata"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("bounds"), "conformance handoff report must declare bounds metadata"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("guidance"), "conformance handoff report must declare guidance path"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("silhouette_overlays"), "conformance handoff report must declare silhouette overlays"): return
+	if not _check(handoff_requirements.outputs.guidance_required_fields.has("clothing_shell_candidates"), "conformance guidance requirements must declare clothing candidates"): return
+	if not _check(handoff_requirements.outputs.guidance_required_fields.has("prop_candidates"), "conformance guidance requirements must declare prop candidates"): return
+	if not _check(handoff_requirements.outputs.required_files.has("conformance_guidance.json"), "conformance handoff requirements must declare guidance JSON"): return
+	if not _check(handoff_requirements.outputs.required_files.has("overlays/front_silhouette_overlay.svg"), "conformance handoff requirements must declare front overlay preview"): return
 	var fixture_file := FileAccess.open("res://tests/fixtures/environment_reports.json", FileAccess.READ)
 	if not _check(fixture_file != null, "environment fixtures could not be opened"): return
 	var fixtures = JSON.parse_string(fixture_file.get_as_text())
@@ -215,6 +354,12 @@ func _init() -> void:
 		var fixture_report := EnvironmentReport.build("all", fixture_checks, "test")
 		if not _check(fixture_report.overall_status == fixture.expected, "environment fixture failed: %s" % fixture.name): return
 		if not _check(EnvironmentReport.exit_code(fixture_report) == (0 if fixture.expected == "ready" else 1), "fixture exit code failed: %s" % fixture.name): return
+	var conformance_fixture_file := FileAccess.open("res://tests/fixtures/conformance_plans.json", FileAccess.READ)
+	if not _check(conformance_fixture_file != null, "conformance fixtures could not be opened"): return
+	var conformance_fixtures = JSON.parse_string(conformance_fixture_file.get_as_text())
+	if not _check(conformance_fixtures is Array, "conformance fixtures are malformed"): return
+	for fixture in conformance_fixtures:
+		if not _check(fixture.has("status") and fixture.has("providers") and fixture.providers is Array, "conformance fixture missing required fields: %s" % fixture.get("name", "")): return
 	quit(0)
 
 
@@ -224,3 +369,16 @@ func _check(condition: bool, message: String) -> bool:
 	push_error(message)
 	quit(1)
 	return false
+
+
+func _write_text(path: String, contents: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(contents)
+	file.close()
+
+
+func _read_text(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return ""
+	return file.get_as_text()

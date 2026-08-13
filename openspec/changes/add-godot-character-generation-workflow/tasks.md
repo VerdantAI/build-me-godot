@@ -85,19 +85,19 @@
 
 ## 8. Mesh Guidance From Approved References
 
-- [ ] 8.1 Define the project-local `mesh_guidance.json` schema emitted after an
+- [x] 8.1 Define the project-local `mesh_guidance.json` schema emitted after an
   approved reference run enters continuation.
-- [ ] 8.2 Populate guidance with approved reference image paths, prompt-derived
+- [x] 8.2 Populate guidance with approved reference image paths, prompt-derived
   character targets, pose contract, scale/alignment assumptions, and primary /
   secondary rigged mesh paths.
-- [ ] 8.3 Record secondary asset candidates and suggested sockets for props
+- [x] 8.3 Record secondary asset candidates and suggested sockets for props
   visible in or implied by the approved reference set.
-- [ ] 8.4 Add a Blender handoff command that reads the guidance artifact and
+- [x] 8.4 Add a Blender handoff command that reads the guidance artifact and
   places non-destructive reference planes against the rigged meshes.
-- [ ] 8.5 Add validation that source rigged meshes are preserved as immutable
+- [x] 8.5 Add validation that source rigged meshes are preserved as immutable
   references and that downstream edits happen in generated project-local work
   files.
-- [ ] 8.6 Add tests for guidance artifact creation, agent-readable changed
+- [x] 8.6 Add tests for guidance artifact creation, agent-readable changed
   paths, and failure cases when approved references or rigged meshes are
   missing.
 

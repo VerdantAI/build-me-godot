@@ -1,0 +1,44 @@
+[
+  {
+    "name": "draft",
+    "status": "conformance_draft",
+    "approved": false,
+    "providers": []
+  },
+  {
+    "name": "provider_ready",
+    "status": "conformance_prepared",
+    "approved": false,
+    "providers": [{"provider_id": "triposr", "status": "configured"}]
+  },
+  {
+    "name": "provider_missing",
+    "status": "conformance_prepared",
+    "approved": false,
+    "providers": [{"provider_id": "triposr", "status": "manual_setup_required"}]
+  },
+  {
+    "name": "proxy_generated",
+    "status": "conformance_prepared",
+    "approved": false,
+    "providers": [{"provider_id": "external_proxy_mesh", "status": "provided"}]
+  },
+  {
+    "name": "approved",
+    "status": "conformance_approved",
+    "approved": true,
+    "providers": [{"provider_id": "triposr", "status": "configured"}]
+  },
+  {
+    "name": "failed",
+    "status": "conformance_failed",
+    "approved": false,
+    "providers": [{"provider_id": "triposr", "status": "failed"}]
+  },
+  {
+    "name": "complete",
+    "status": "complete",
+    "approved": true,
+    "providers": [{"provider_id": "triposr", "status": "configured"}]
+  }
+]

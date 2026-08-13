@@ -45,6 +45,8 @@ func check(capability: String, options: Dictionary) -> Array[Dictionary]:
 			"Configured local reconstruction provider", {},
 			PackedStringArray(["configure.reconstruction.provider"])
 		))
+	if capability in ["all", "field_engineer_mesh_conformance"]:
+		checks.append(_triposr_conformance_check(str(options.get("reconstruction_command", "")).strip_edges()))
 	if capability in ["all", "blender_humanoid_build"]:
 		var animation_asset := str(options.get("animation_asset", "")).strip_edges()
 		var animation_exists := not animation_asset.is_empty() and FileAccess.file_exists(animation_asset)
@@ -57,6 +59,43 @@ func check(capability: String, options: Dictionary) -> Array[Dictionary]:
 			PackedStringArray(["configure.animation.asset"])
 		))
 	return checks
+
+
+func _triposr_conformance_check(reconstruction_command: String) -> Dictionary:
+	var requirements_path := "res://addons/build_me_godot/integrations/reconstruction/triposr/triposr.requirements.json"
+	var requirements := _load_json(requirements_path)
+	var evidence := {
+		"requirements": requirements_path,
+		"provider_id": "triposr",
+		"provider_status": "supported_user_managed_command",
+		"automatic_downloads_allowed": false,
+		"license_record": requirements.get("code_license", "MIT"),
+		"command_contract": requirements.get("build_me_godot_command_contract", {})
+	}
+	if reconstruction_command.is_empty():
+		return EnvironmentReport.result(
+			"conformance.provider.triposr", "field_engineer_mesh_conformance", "warning", "optional",
+			"TripoSR proxy generation command is not configured; conformance can still import user-provided proxy meshes.",
+			null, "Configured user-managed TripoSR command", evidence,
+			PackedStringArray(["write.container.config", "install.manual.triposr.provider"])
+		)
+	var output := []
+	var exit_code := OS.execute(reconstruction_command, ["--version"], output, true)
+	return EnvironmentReport.result(
+		"conformance.provider.triposr", "field_engineer_mesh_conformance",
+		"pass" if exit_code == 0 else "warning", "optional",
+		"TripoSR proxy generation command is configured." if exit_code == 0 else "Configured TripoSR command did not pass its version probe; manual proxy import remains available.",
+		reconstruction_command, "User-managed TripoSR command", evidence,
+		PackedStringArray(["write.container.config", "install.manual.triposr.provider"])
+	)
+
+
+func _load_json(path: String) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed = JSON.parse_string(file.get_as_text())
+	return parsed if parsed is Dictionary else {}
 
 
 func _version_at_least(detected: PackedInt32Array, minimum: Array) -> bool:

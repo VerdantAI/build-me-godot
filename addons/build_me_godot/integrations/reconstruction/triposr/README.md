@@ -1,6 +1,19 @@
 # TripoSR external reconstruction adapter
 
-This optional adapter invokes a user-managed local TripoSR checkout. It does not download weights, clone repositories, install Python packages, or modify ComfyUI/system Python.
+This optional adapter invokes a user-managed local TripoSR checkout. It does
+not download weights at generation time, clone repositories, install Python
+packages, or modify ComfyUI/system Python. The repository setup utility detects
+expected local TripoSR model paths, but it no longer downloads or installs
+`config.yaml`, `model.ckpt`, or reconstruction runtime files. Reuse existing
+user-owned model files directly or mount them into the local container
+toolchain.
+
+When ComfyUI is the orchestration surface, prefer the external
+`flowtyone/ComfyUI-Flowty-TripoSR` node before writing a custom wrapper. The
+setup utility detects an already installed native node, but does not stage or
+install the GPL-3.0 node archive. The node code remains external and is not
+bundled with Build Me Godot. Prefer the container toolchain when the runtime
+dependencies are not already available in the user's ComfyUI environment.
 
 Validated source and weight combination:
 

@@ -24,6 +24,41 @@ Gator Model Studio and Blackwater Gator Studios are names belonging to their res
 
 `integrations/comfyui/character_turnaround_output.py` supplies local-only ComfyUI nodes for loading, normalizing, composing, and deterministically saving turnaround views. It does not download models or contact external services.
 
+## Quaternius Universal Animation Library Standard
+
+- Publisher: Quaternius
+- License reviewed: CC0-1.0
+- Included with Build Me Godot: Yes, as a scoped onboarding asset subset
+- Required by Build Me Godot: No
+
+The packaged onboarding scene at `examples/base_characters.tscn` instances two rigged Quaternius mannequins and their shared animation library from `examples/quaternius_ik_rigged/`. These assets are included so new users can inspect the expected two-character rig setup immediately after enabling the addon. Production characters, reconstruction meshes, and project animation libraries remain user-owned project assets.
+
+## TripoSR
+
+- Publisher: VAST-AI-Research / Stability AI research release
+- Project: [TripoSR](https://github.com/VAST-AI-Research/TripoSR)
+- Version reviewed: `107cefdc244c39106fa830359024f6a2f1c78871`; model revision `5b521936b01fbe1890f6f9baed0254ab6351c04a`
+- License reviewed for that version: MIT code and MIT weights
+- Included with Build Me Godot: No
+- Required by Build Me Godot: No
+
+TripoSR is acknowledged as an optional, user-managed proxy reconstruction provider for field-engineer mesh conformance. Build Me Godot only records readiness, provenance, and install-plan guidance; it does not clone the repository, install Python packages, download weights, or treat generated proxy meshes as production topology.
+
+## ComfyUI-Flowty-TripoSR
+
+- Publisher: flowtyone / flowt.ai community project
+- Project: [ComfyUI-Flowty-TripoSR](https://github.com/flowtyone/ComfyUI-Flowty-TripoSR)
+- Version reviewed: master branch on 2026-08-13
+- License reviewed for that version: GPL-3.0
+- Included with Build Me Godot: No
+- Required by Build Me Godot: No
+
+ComfyUI-Flowty-TripoSR is acknowledged as an optional external ComfyUI custom
+node for local TripoSR proxy reconstruction. Because it is GPL-3.0, Build Me
+Godot does not bundle or copy its code into the MIT addon package. The setup
+app detects an already installed native node but does not download, stage, or
+install the node or its Python requirements.
+
 ## Burb Sweeper Humanoid Pipeline
 
 - Copyright: 2026 Inhuman Entertainment

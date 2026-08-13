@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "builder_version": "1.0.0",
+  "minimum_blender_version": [4, 2, 0],
+  "pose_contract": "neutral_a_pose_30deg_v1",
+  "required_operators": [
+    "import_scene.gltf",
+    "wm.obj_import",
+    "wm.save_as_mainfile"
+  ],
+  "configuration": {
+    "required": ["project_root", "output_dir"],
+    "optional": ["conformance_plan", "mesh_guidance"]
+  },
+  "outputs": {
+    "required_files": [
+      "conformance_handoff_report.json",
+      "conformance_guidance.json",
+      "{character_id}_{reference_version}_conformance_handoff.blend",
+      "overlays/front_silhouette_overlay.json",
+      "overlays/front_silhouette_overlay.svg",
+      "overlays/right_silhouette_overlay.json",
+      "overlays/right_silhouette_overlay.svg",
+      "overlays/back_silhouette_overlay.json",
+      "overlays/back_silhouette_overlay.svg"
+    ],
+    "report_required_fields": ["character_id", "reference_version", "pose_contract", "source_plan", "reference_images", "reference_meshes", "work_meshes", "validation_constraints", "alignment", "bounds", "silhouette_overlays", "guidance", "changed_paths"],
+    "guidance_required_fields": ["character_id", "reference_version", "pose_contract", "bounds", "clothing_shell_candidates", "prop_candidates", "material_targets", "color_targets", "validation_constraints", "changed_paths"]
+  }
+}

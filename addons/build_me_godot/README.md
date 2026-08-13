@@ -28,7 +28,7 @@ Machine configuration resolves from CLI overrides, `BUILD_ME_GODOT_*` environmen
 
 ## Example project
 
-For a runnable consumer-project setup, use the companion [godot-addons-example-project](https://github.com/VerdantAI/godot-addons-example-project). It is separate from the Asset Store addon package and is the right place for sample scenes, rig placeholders, character manifests, and end-to-end manual workflow checks.
+For a runnable consumer-project setup, use the companion [godot-addons-example-project](https://github.com/VerdantAI/godot-addons-example-project). It is separate from the Asset Store addon package and is the right place for project-specific sample scenes, character manifests, and end-to-end manual workflow checks.
 
 The addon package remains self-contained under `addons/build_me_godot/`. Project-owned data belongs under each game's `res://build_me_godot/`.
 
@@ -36,9 +36,17 @@ The addon package remains self-contained under `addons/build_me_godot/`. Project
 
 Build Me Godot is driven from the target Godot project. Open the dock, create or select a character, confirm the two rigged mesh inputs, enter character metadata and prompts, then queue a local ComfyUI reference run. Runs are stored as sequential `v1`, `v2`, and later versions in `res://build_me_godot/characters/<character_id>/character.json`.
 
-The setup tab shows colored local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the base character scene. The scene field defaults to `res://scenes/base_characters.tscn`; use **Load base character scene** when the consuming project provides that scene with its mannequin characters for rigged-mesh inspection. This is separate from the project's normal `main.tscn` entry scene.
+The setup tab shows colored local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the base character scene. The scene field defaults to the packaged onboarding scene at `res://addons/build_me_godot/examples/base_characters.tscn`; use **Load base character scene** to inspect the two CC0 rigged Quaternius mannequins and their shared animation library before replacing them with project-specific rigged meshes. This is separate from the project's normal `main.tscn` entry scene.
 
-After reviewing generated references, approve one completed version and explicitly continue the pipeline. Continuation writes `res://build_me_godot/characters/<character_id>/blender/<version>/reference_inputs.json` for the Blender stage and advances the manifest to `pipeline_enabled`. Final character scenes, animations, and secondary assets are registered back into the same manifest when downstream work completes.
+After reviewing generated references, approve one completed version and explicitly continue the pipeline. Continuation writes `res://build_me_godot/characters/<character_id>/blender/<version>/reference_inputs.json` and `mesh_guidance.json` for the Blender stage, then advances the manifest to `pipeline_enabled`. Final character scenes, animations, and secondary assets are registered back into the same manifest when downstream work completes.
+
+For field-engineer characters, an approved reference can also prepare a
+non-destructive conformance plan under
+`res://build_me_godot/characters/<character_id>/conformance/<version>/`.
+The plan records source references, rigged meshes, TripoSR/manual proxy
+provenance, high-visibility workwear targets, material/color targets, prop
+socket candidates, and validation constraints. Generated or reconstructed
+meshes are immutable references; they are not production topology.
 
 Prompts are project data owned by Godot, not by the ComfyUI editor. You can still tune in ComfyUI: export the workflow JSON, import its prompt fields back into the dock or CLI, save the character draft, then queue from Godot. Queued runs record the ComfyUI `prompt_id` when available and save the configured API workflow snapshot under `res://build_me_godot/characters/<character_id>/workflows/<version>_api.json` for later agent or headless replay.
 
@@ -49,6 +57,9 @@ godot --no-header --headless --path . --script res://addons/build_me_godot/cli/c
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- inspect --character-id field_engineer
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/canonical_only_api.json
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- prepare-conformance --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- generate-proxy --character-id field_engineer --version v1 --provider triposr
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- inspect-conformance --character-id field_engineer --version v1
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- continue --character-id field_engineer --version v1
 ```
 
@@ -68,7 +79,38 @@ See [Developer handoff](docs/handoff.md) for repository boundaries, current capa
 
 See [Store listing](docs/store-listing.md) for distribution copy and [Release checklist](docs/release-checklist.md) for the publishing gate.
 
-The optional [TripoSR adapter](integrations/reconstruction/triposr/README.md) supports a user-managed, isolated local reconstruction environment. It is single-image reconstruction and is never presented as joint multiview generation.
+The optional [TripoSR adapter](integrations/reconstruction/triposr/README.md)
+supports user-managed local reconstruction. Because ComfyUI is already part of
+the Build Me Godot stack, the preferred local path is the external
+`flowtyone/ComfyUI-Flowty-TripoSR` node when it is already installed or
+provided by the local container toolchain. The setup utility detects native
+Flowty/TripoSR availability, but does not download the GPL node, install
+Python packages, download TripoSR weights, or copy checkpoints into ComfyUI. A
+direct `BUILD_ME_GODOT_RECONSTRUCTION_COMMAND` wrapper remains available as a
+fallback when the Comfy node path is not suitable.
+
+Ollama can help with optional vision-language review of references and target
+JSON, but it is not used as the TripoSR wrapper. Ollama's supported model
+surface is LLM/vision inference, not arbitrary image-to-3D reconstruction
+execution.
+
+Field-engineer image-to-mesh best practices: use a clean front view and
+matching side/back references, keep the full body centered, normalize alpha or
+background before reconstruction, avoid occluded tools and cropped feet, keep
+view labels stable, prompt explicit safety workwear, and retain artist review
+before any downstream mesh edits.
+
+The packaged Blender handoff command
+`integrations/blender/prepare_conformance_handoff.py` reads a conformance plan
+or continuation `mesh_guidance.json`,
+creates reference-only image/source/proxy collections, duplicates editable work
+meshes only into generated files, and writes a handoff report with changed
+paths. It also records deterministic `neutral_a_pose_30deg_v1` alignment
+metadata and writes front/right/back silhouette overlay JSON plus SVG previews.
+It also writes `conformance_guidance.json` with bounds/silhouette deltas,
+field-engineer clothing shell candidates, prop/socket candidates, material and
+color targets, warnings, and changed paths. It does not convert proxy meshes
+into production topology.
 
 ## License
 

@@ -70,6 +70,14 @@ func _run() -> void:
 			result = store.approve_generation_version(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
 		"continue":
 			result = store.continue_pipeline(str(parsed.values.get("character_id", "")), parsed.values)
+		"inspect-conformance":
+			result = store.inspect_conformance(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"prepare-conformance":
+			result = store.prepare_conformance(str(parsed.values.get("character_id", "")), parsed.values)
+		"generate-proxy":
+			result = store.generate_proxy(str(parsed.values.get("character_id", "")), parsed.values)
+		"approve-conformance":
+			result = store.approve_conformance(str(parsed.values.get("character_id", "")), parsed.values)
 		_:
 			result = {"ok": false, "error": "Unknown command: %s" % parsed.command}
 	if not result.ok:
@@ -82,22 +90,32 @@ func _run() -> void:
 		"path": result.get("path", ""),
 		"manifest": result.manifest,
 		"available_actions": store.available_actions(result.manifest),
-		"changed_paths": result.get("changed_paths", [])
+		"changed_paths": result.get("changed_paths", []),
+		"conformance_plan_path": result.get("conformance_plan_path", ""),
+		"conformance_plan": result.get("conformance_plan", {}),
+		"mesh_guidance": result.get("mesh_guidance", {})
 	}
+	if bool(parsed.get("support_report", false)):
+		output = _redact_support_output(output)
 	print(JSON.stringify(output))
 	quit(0)
 
 
 func _parse_args(arguments: PackedStringArray) -> Dictionary:
-	if arguments.is_empty() or arguments[0] not in ["draft", "import-workflow", "inspect", "queue", "approve", "continue"]:
-		return {"ok": false, "error": "Usage: draft|import-workflow|inspect|queue|approve|continue --character-id ID [options]"}
+	if arguments.is_empty() or arguments[0] not in ["draft", "import-workflow", "inspect", "queue", "approve", "continue", "inspect-conformance", "prepare-conformance", "generate-proxy", "approve-conformance"]:
+		return {"ok": false, "error": "Usage: draft|import-workflow|inspect|queue|approve|continue|inspect-conformance|prepare-conformance|generate-proxy|approve-conformance --character-id ID [options]"}
 	var result := {
 		"ok": true,
 		"command": arguments[0],
-		"values": {}
+		"values": {},
+		"support_report": false
 	}
 	var index := 1
 	while index < arguments.size():
+		if arguments[index] == "--support-report":
+			result.support_report = true
+			index += 1
+			continue
 		if index + 1 >= arguments.size():
 			return {"ok": false, "error": "Missing value for %s" % arguments[index]}
 		var option := arguments[index]
@@ -126,13 +144,27 @@ func _parse_args(arguments: PackedStringArray) -> Dictionary:
 			"--workflow-id": result.values["workflow_id"] = value
 			"--workflow-version": result.values["workflow_version"] = value
 			"--warnings-acknowledged": result.values["warnings_acknowledged"] = value.to_lower() in ["1", "true", "yes", "y"]
+			"--reconstruction-command": result.values["reconstruction_command"] = value
+			"--provider-id": result.values["provider_id"] = value
+			"--provider": result.values["provider_id"] = value
+			"--input-view": result.values["input_view"] = value
+			"--proxy-mesh":
+				_ensure_proxy_meshes(result.values)
+				result.values.proxy_meshes[value.get_basename()] = value
+			"--proxy-license-record": result.values["proxy_license_record"] = value
+			"--proxy-commercial-use": result.values["proxy_commercial_use"] = value
+			"--proxy-provenance":
+				var provenance = JSON.parse_string(value)
+				if not provenance is Dictionary:
+					return {"ok": false, "error": "--proxy-provenance must be a JSON object"}
+				result.values["proxy_provenance"] = provenance
 			_: return {"ok": false, "error": "Unknown option: %s" % option}
 		index += 2
 	if not result.values.has("character_id"):
 		return {"ok": false, "error": "--character-id is required"}
 	if result.command == "import-workflow" and not result.values.has("workflow_path"):
 		return {"ok": false, "error": "--workflow-path is required for import-workflow"}
-	if result.command in ["approve", "continue"] and not result.values.has("version"):
+	if result.command in ["approve", "continue", "prepare-conformance", "generate-proxy", "approve-conformance"] and not result.values.has("version"):
 		return {"ok": false, "error": "--version is required for %s" % result.command}
 	return result
 
@@ -147,9 +179,40 @@ func _ensure_metadata(values: Dictionary) -> void:
 		values["metadata"] = {}
 
 
+func _ensure_proxy_meshes(values: Dictionary) -> void:
+	if not values.has("proxy_meshes"):
+		values["proxy_meshes"] = {}
+
+
 func _load_workflow(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return {}
 	var parsed = JSON.parse_string(file.get_as_text())
 	return parsed if parsed is Dictionary else {}
+
+
+func _redact_support_output(value: Dictionary) -> Dictionary:
+	var copy := value.duplicate(true)
+	return _redact_value(copy, OS.get_environment("HOME").trim_suffix("/"), ProjectSettings.globalize_path("res://").trim_suffix("/"), "")
+
+
+func _redact_value(value, home: String, project: String, key: String):
+	if value is Dictionary:
+		for child_key in value.keys():
+			value[child_key] = _redact_value(value[child_key], home, project, str(child_key))
+		return value
+	if value is Array:
+		for index in value.size():
+			value[index] = _redact_value(value[index], home, project, key)
+		return value
+	if value is String:
+		if key in ["prompt", "positive_prompt", "negative_prompt"]:
+			return "<redacted>"
+		var text: String = value
+		if not project.is_empty():
+			text = text.replace(project, "res://")
+		if not home.is_empty():
+			text = text.replace(home, "<home>")
+		return text
+	return value

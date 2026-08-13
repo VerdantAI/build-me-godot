@@ -41,6 +41,55 @@ static func _action(id: String, options: Dictionary) -> Dictionary:
 				"verification_checks": ["comfyui.nodes.canonical_only", "comfyui.nodes.multiview_only"],
 				"applied": false
 			}
+		"install.manual.triposr.provider":
+			return {
+				"id": id, "mode": "manual",
+				"summary": "Configure a user-managed TripoSR proxy generation command.",
+				"rationale": "Field-engineer conformance can run a configured local TripoSR wrapper to produce immutable reference meshes, but Build Me Godot does not clone repositories, install Python packages, download weights, or install ComfyUI custom nodes automatically.",
+				"source": "https://github.com/VAST-AI-Research/TripoSR",
+				"target": "BUILD_ME_GODOT_RECONSTRUCTION_COMMAND or res://build_me_godot.local.cfg reconstruction_command",
+				"command_contract": {
+					"version_probe": "--version",
+					"arguments": ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"],
+					"automatic_downloads_allowed": false
+				},
+				"paths": [
+					"res://addons/build_me_godot/integrations/reconstruction/triposr/triposr.requirements.json",
+					"res://addons/build_me_godot/integrations/reconstruction/conformance_providers.json"
+				],
+				"prerequisites": [
+					"User-installed TripoSR checkout and Python environment",
+					"User-provided wrapper command that accepts --input, --output, and --metadata-output",
+					"User-reviewed MIT code and weight licenses",
+					"Existing user-owned model weights mounted into the wrapper or container"
+				],
+				"reversible": true,
+				"license": {
+					"code": "MIT",
+					"weights": "MIT",
+					"commercial_use": true
+				},
+				"verification_checks": ["conformance.provider.triposr"],
+				"applied": false
+			}
+		"write.container.config":
+			return {
+				"id": id, "mode": "manual",
+				"summary": "Write local container toolchain configuration that reuses existing model folders.",
+				"rationale": "The container path should provide the runtime and mount user-owned model/cache folders instead of mutating the user's ComfyUI environment or downloading duplicate weights.",
+				"source": "utils/check-local-requirements.sh",
+				"target": "utils/check-local-container.local.env",
+				"setup_command": "utils/check-local-requirements.sh apply write.container.config --yes --json",
+				"license": {
+					"code": null,
+					"weights": null,
+					"commercial_use": true,
+					"notice": "No model weights are baked into the container image; existing user-owned folders are mounted."
+				},
+				"prerequisites": ["Existing Podman, Docker, or Apptainer runtime", "Existing user-owned model/cache folders"],
+				"verification_checks": ["container.runtime", "container.model_mounts"],
+				"applied": false
+			}
 		_:
 			return {
 				"id": id, "mode": "manual", "summary": "Manual configuration is required.",
