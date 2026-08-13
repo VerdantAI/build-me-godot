@@ -19,7 +19,8 @@ scenes, sample rig placeholders, sample manifests, and end-to-end manual workflo
 fixtures there instead of inside this distributable addon folder.
 
 During local development, install the addon into that example project with a
-symlink so edits here are active there immediately:
+copied addon directory or an exact symlink so edits here are active there
+immediately:
 
 ```sh
 cd /home/buddha/verdant/godot-addons-example-project
@@ -27,8 +28,10 @@ mkdir -p addons
 ln -s /home/buddha/verdant/build-me-godot/addons/build_me_godot addons/build_me_godot
 ```
 
-Do not treat that symlink as the Store package. Release validation still needs a
-normal copied/exported addon install.
+The installed shape must be `addons/build_me_godot/plugin.cfg`. Do not link the
+repository root, the top-level `build_me_godot/` data folder, or a nested
+`addons/` folder. Do not treat a development symlink as the Store package.
+Release validation still needs a normal copied/exported addon install.
 
 ## Current capabilities
 
