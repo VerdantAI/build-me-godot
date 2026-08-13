@@ -5,3 +5,6 @@
 /**        export-ignore
 /addons    !export-ignore
 /addons/** !export-ignore
+
+# Store Blender scene files through Git LFS.
+*.blend filter=lfs diff=lfs merge=lfs -text
