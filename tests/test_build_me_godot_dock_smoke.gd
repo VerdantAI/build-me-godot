@@ -15,6 +15,8 @@ func _run() -> void:
 	dock.store = store
 	get_root().add_child(dock)
 	await process_frame
+	if not _check(dock.prompt.text.contains("neutral A-pose"), "dock default prompt was not populated"): return
+	if not _check(dock.negative_prompt.text.contains("cropped head"), "dock default negative prompt was not populated"): return
 
 	dock.character_id.text = "Dock Smoke"
 	dock.display_name.text = "Dock Smoke"

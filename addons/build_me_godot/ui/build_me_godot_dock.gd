@@ -8,6 +8,9 @@ const EnvironmentChecker = preload("res://addons/build_me_godot/services/environ
 const EnvironmentReport = preload("res://addons/build_me_godot/services/environment/environment_report.gd")
 const Config = preload("res://addons/build_me_godot/services/config.gd")
 
+const DEFAULT_PROMPT := "Full-body game character reference of a practical field engineer and surveyor, sturdy work boots, durable work trousers, canvas work jacket, utility belt, functional realistic clothing construction, neutral A-pose, arms approximately 30 degrees away from the torso, feet shoulder-width apart, neutral expression, straight posture, complete head and feet visible, centered, minimal perspective distortion, approximately orthographic character-development reference, uniform diffuse studio lighting, plain neutral light gray background, clothing seams and construction clearly visible, no props obscuring the body."
+const DEFAULT_NEGATIVE_PROMPT := "cropped head, cropped feet, missing limbs, extra limbs, crossed arms, crossed legs, action pose, contrapposto, foreshortening, wide angle, perspective distortion, dramatic lighting, hard cast shadow, cluttered background, handheld props, text, watermark"
+
 var store := CharacterStore.new()
 var character_select: OptionButton
 var project_context: Label
@@ -67,7 +70,11 @@ func _build_ui() -> void:
 	role = _add_line_edit("Role / archetype", "construction field engineer")
 	style_notes = _add_line_edit("Style notes", "realistic game character")
 	prompt = _add_text_edit("Character prompt", 150)
+	prompt.text = DEFAULT_PROMPT
+	prompt.tooltip_text = "Edit the subject, clothing, silhouette, style, and pose constraints; keep full-body neutral reference requirements for Blender."
 	negative_prompt = _add_text_edit("Negative prompt", 80)
+	negative_prompt.text = DEFAULT_NEGATIVE_PROMPT
+	negative_prompt.tooltip_text = "Edit unwanted crops, pose drift, extra limbs, perspective distortion, lighting issues, and background clutter."
 	var rigged_mesh_title := Label.new()
 	rigged_mesh_title.text = "Rigged mesh inputs"
 	add_child(rigged_mesh_title)
@@ -271,13 +278,13 @@ func _new_character() -> void:
 	display_name.clear()
 	role.clear()
 	style_notes.clear()
-	prompt.clear()
-	negative_prompt.clear()
+	prompt.text = DEFAULT_PROMPT
+	negative_prompt.text = DEFAULT_NEGATIVE_PROMPT
 	primary_rigged_mesh.text = CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH
 	secondary_rigged_mesh.text = CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH
 	seed.value = 0
 	_refresh_review({})
-	_set_status("Enter a character ID and prompt, then save.")
+	_set_status("Edit the default prompt for this character, then save.")
 
 
 func _save_character() -> Dictionary:
