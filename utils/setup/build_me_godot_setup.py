@@ -5,11 +5,14 @@ import argparse
 import json
 import os
 import re
+import signal
 import shlex
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +24,7 @@ ADDON_SOURCE = PROJECT_ROOT / "addons" / "build_me_godot"
 DEFAULT_EXAMPLE_PROJECT = PROJECT_ROOT.parent / "godot-addons-example-project"
 DEFAULT_CONFIG = PROJECT_ROOT / "utils" / "check-local-requirements.local.conf"
 EXAMPLE_CONFIG = PROJECT_ROOT / "utils" / "check-local-requirements.conf.example"
+RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"build-me-godot-{os.getuid()}"
 HELPER_SOURCE = PROJECT_ROOT / "addons" / "build_me_godot" / "integrations" / "comfyui" / "character_turnaround_output.py"
 WORKFLOW_REQUIREMENTS = [
     PROJECT_ROOT / "addons" / "build_me_godot" / "workflows" / "canonical_only_api.requirements.json",
@@ -103,6 +107,7 @@ class Context:
     missing_models: list[dict[str, str]] = field(default_factory=list)
     missing_nodes: list[str] = field(default_factory=list)
     changed_paths: list[str] = field(default_factory=list)
+    quiet_checks: bool = False
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
@@ -141,6 +146,96 @@ def http_json(url: str, timeout: float = 3.0) -> tuple[bool, Any]:
         return True, json.loads(data)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         return False, {"error": str(exc)}
+
+
+def wait_for_http(url: str, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        ok, _data = http_json(url, timeout=1.0)
+        if ok:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def startup_timeout(default: float) -> float:
+    try:
+        return max(0.0, float(os.environ.get("BUILD_ME_GODOT_STARTUP_TIMEOUT", str(default))))
+    except ValueError:
+        return default
+
+
+def process_record_path(name: str) -> Path:
+    return RUNTIME_DIR / f"{name}.json"
+
+
+def remove_process_record(name: str) -> None:
+    try:
+        process_record_path(name).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def managed_process(name: str) -> dict[str, Any] | None:
+    path = process_record_path(name)
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        pid = int(record["pid"])
+        os.kill(pid, 0)
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        if record.get("marker", "") not in cmdline:
+            raise ProcessLookupError
+        return record
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError, OSError, ProcessLookupError):
+        remove_process_record(name)
+        return None
+
+
+def start_managed_process(name: str, command: list[str], cwd: Path | None, marker: str) -> tuple[int, Path]:
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = RUNTIME_DIR / f"{name}.log"
+    log = log_path.open("ab")
+    try:
+        process = subprocess.Popen(command, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    finally:
+        log.close()
+    record = {"pid": process.pid, "command": command, "cwd": str(cwd or ""), "marker": marker, "log": str(log_path)}
+    process_record_path(name).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    time.sleep(0.1)
+    if process.poll() is not None:
+        remove_process_record(name)
+        raise SystemExit(f"{name} exited immediately; inspect {log_path}")
+    return process.pid, log_path
+
+
+def stop_managed_process(name: str) -> int:
+    record = managed_process(name)
+    if record is None:
+        raise SystemExit(f"No running {name} process managed by this utility was found.")
+    pid = int(record["pid"])
+    os.killpg(pid, signal.SIGTERM)
+    for _attempt in range(30):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    remove_process_record(name)
+    return pid
+
+
+def comfyui_start_command(ctx: Context) -> list[str] | None:
+    if not is_comfyui_root(ctx.comfyui_root) or not (ctx.comfyui_root / "main.py").is_file():
+        return None
+    python_candidates = [ctx.comfyui_root / ".venv" / "bin" / "python", ctx.comfyui_root / "venv" / "bin" / "python"]
+    python = next((str(path) for path in python_candidates if path.is_file() and os.access(path, os.X_OK)), sys.executable)
+    parsed = urllib.parse.urlparse(ctx.comfyui_url)
+    command = [python, "main.py"]
+    if parsed.hostname:
+        command.extend(["--listen", parsed.hostname])
+    if parsed.port:
+        command.extend(["--port", str(parsed.port)])
+    return command
 
 
 def is_comfyui_root(path: Path | None) -> bool:
@@ -274,7 +369,7 @@ def build_context(args: argparse.Namespace) -> Context:
 
 def add_check(ctx: Context, check: Check) -> None:
     ctx.checks.append(check)
-    if not ctx.json_output:
+    if not ctx.json_output and not ctx.quiet_checks:
         print(f"[{check.status}] {check.summary}")
 
 
@@ -311,20 +406,33 @@ def run_checks(ctx: Context) -> None:
         f"ComfyUI root: {ctx.comfyui_root} ({ctx.comfyui_root_source})" if ctx.comfyui_root else "ComfyUI root not configured or discovered",
         required=False,
     ))
+    comfy_process = managed_process("comfyui")
+    comfy_command = comfyui_start_command(ctx)
+    if comfy_process:
+        add_action(ctx, Action("stop.comfyui", "Stop the ComfyUI process started by this utility.", True, details=comfy_process))
+    elif not ok and comfy_command:
+        add_action(ctx, Action("start.comfyui", "Start the configured local ComfyUI server.", True, details={"command": comfy_command, "cwd": str(ctx.comfyui_root)}))
 
     helper = ctx.comfyui_root / "custom_nodes" / "character_turnaround_output.py" if ctx.comfyui_root else None
     if helper:
         if helper.exists():
-            add_check(ctx, Check("comfyui.helper", "ok", "ComfyUI turnaround helper", details={"path": str(helper)}))
+            add_check(ctx, Check("comfyui.helper", "ok", "Build Me Godot custom-node helper installed on disk", details={"path": str(helper), "loaded": None if not ok else "checked below"}))
         else:
-            add_check(ctx, Check("comfyui.helper", "missing", "ComfyUI turnaround helper", details={"target": str(helper)}))
+            add_check(ctx, Check("comfyui.helper", "missing", "Build Me Godot custom-node helper is not installed", details={"target": str(helper)}))
             add_action(ctx, Action("install.comfyui.helper", "Copy the Build Me Godot ComfyUI helper into custom_nodes.", True, details={"target": str(helper), "source": str(HELPER_SOURCE), "restart_required": True}))
 
     ok, object_info = http_json(ctx.comfyui_url.rstrip("/") + "/object_info")
     if ok:
-        missing_nodes = [node for node in load_required_nodes() if node not in object_info]
+        required_nodes = load_required_nodes()
+        missing_nodes = [node for node in required_nodes if node not in object_info]
         ctx.missing_nodes = missing_nodes
-        add_check(ctx, Check("comfyui.nodes", "ok" if not missing_nodes else "missing", "ComfyUI required workflow nodes", details={"missing": missing_nodes}))
+        loaded_count = len(required_nodes) - len(missing_nodes)
+        add_check(ctx, Check(
+            "comfyui.nodes",
+            "ok" if not missing_nodes else "missing",
+            f"ComfyUI workflow nodes loaded: {loaded_count}/{len(required_nodes)}",
+            details={"required": required_nodes, "missing": missing_nodes, "loaded_count": loaded_count},
+        ))
         if helper and helper.exists() and any(node in HELPER_NODE_CLASSES for node in missing_nodes):
             add_action(ctx, Action(
                 "refresh.comfyui.helper",
@@ -338,7 +446,12 @@ def run_checks(ctx: Context) -> None:
                 },
             ))
     else:
-        add_check(ctx, Check("comfyui.nodes", "skip", "ComfyUI node metadata unavailable", details=object_info))
+        add_check(ctx, Check(
+            "comfyui.nodes",
+            "skip",
+            "ComfyUI workflow nodes not yet verified; start ComfyUI and rerun",
+            details=object_info,
+        ))
 
     if ctx.comfyui_root:
         for artifact in load_model_artifacts():
@@ -350,7 +463,14 @@ def run_checks(ctx: Context) -> None:
                     "target_dir": str(model_dest_dir(ctx.comfyui_root, artifact["loader"])),
                 }
                 ctx.missing_models.append(row)
-        add_check(ctx, Check("comfyui.models", "ok" if not ctx.missing_models else "missing", "ComfyUI declared model files", details={"missing": ctx.missing_models}))
+        declared_model_count = len(load_model_artifacts())
+        installed_model_count = declared_model_count - len(ctx.missing_models)
+        add_check(ctx, Check(
+            "comfyui.models",
+            "ok" if not ctx.missing_models else "missing",
+            f"ComfyUI model files installed: {installed_model_count}/{declared_model_count}",
+            details={"missing": ctx.missing_models, "installed_count": installed_model_count, "declared_count": declared_model_count},
+        ))
         if ctx.missing_models:
             add_action(ctx, Action("download.models", "Download missing reviewed model files into the staging directory.", True, details={"directory": str(ctx.model_download_dir), "models": ctx.missing_models}))
             staged = [row for row in ctx.missing_models if Path(row["staged_path"]).exists()]
@@ -358,8 +478,16 @@ def run_checks(ctx: Context) -> None:
     else:
         add_check(ctx, Check("comfyui.models", "skip", "ComfyUI model files require ComfyUI root", required=False))
 
+    ollama = command_path("ollama")
+    ollama_ok, ollama_status = http_json(ctx.ollama_host.rstrip("/") + "/api/tags")
+    add_check(ctx, Check("ollama.server", "ok" if ollama_ok else "skip", f"Ollama server at {ctx.ollama_host}", required=False, details={"response": "reachable" if ollama_ok else ollama_status}))
+    ollama_process = managed_process("ollama")
+    if ollama_process:
+        add_action(ctx, Action("stop.ollama", "Stop the Ollama process started by this utility.", True, details=ollama_process))
+    elif not ollama_ok and ollama and ctx.ollama_models:
+        add_action(ctx, Action("start.ollama", "Start the local Ollama server.", True, details={"command": [ollama, "serve"]}))
+
     if ctx.ollama_models:
-        ollama = command_path("ollama")
         add_check(ctx, Check("tool.ollama", "ok" if ollama else "missing", f"Ollama executable: {ollama or 'missing'}", required=False, details={"path": ollama}))
         if ollama:
             result = subprocess.run(["ollama", "list"], check=False, text=True, capture_output=True)
@@ -369,7 +497,13 @@ def run_checks(ctx: Context) -> None:
             for model in missing:
                 add_action(ctx, Action(f"pull.ollama.{model}", f"Pull Ollama model {model}.", True, details={"model": model}))
     else:
-        add_check(ctx, Check("ollama.models", "skip", "Ollama models not requested", required=False))
+        add_check(ctx, Check("ollama.models", "ok", "Ollama models: none required", required=False))
+
+    blender_process = managed_process("blender")
+    if blender_process:
+        add_action(ctx, Action("stop.blender", "Stop the Blender process started by this utility.", True, details=blender_process))
+    elif blender:
+        add_action(ctx, Action("start.blender", "Start Blender using the configured executable.", True, details={"command": [blender]}))
 
     check_example_project(ctx)
 
@@ -514,6 +648,10 @@ class DownloadProgress:
 
 def action_detail_lines(action: Action) -> list[str]:
     details = action.details
+    if action.id.startswith("start."):
+        return [f"Run in background: {shlex.join(details.get('command', []))}", f"Log: {RUNTIME_DIR / (action.id.removeprefix('start.') + '.log')}"]
+    if action.id.startswith("stop."):
+        return [f"Stop managed PID: {details.get('pid', '')}", "Processes not started by this utility are never stopped."]
     if action.id == "write.local.config":
         return [f"Write local setup config: {details.get('target', '')}"]
     if action.id == "install.comfyui.helper":
@@ -589,7 +727,35 @@ def execute_action(ctx: Context, action_id: str) -> None:
         stream = sys.stderr if ctx.json_output else sys.stdout
         print(message, file=stream)
 
-    if action_id == "write.local.config":
+    if action_id == "start.comfyui":
+        command = comfyui_start_command(ctx)
+        if command is None or ctx.comfyui_root is None:
+            raise SystemExit("A ComfyUI root containing main.py is required.")
+        pid, log = start_managed_process("comfyui", command, ctx.comfyui_root, "main.py")
+        emit(f"Started ComfyUI (PID {pid}); log: {log}")
+        if not wait_for_http(ctx.comfyui_url.rstrip("/") + "/system_stats", startup_timeout(30.0)):
+            emit("ComfyUI is still starting; check the log or rerun the utility shortly.")
+    elif action_id == "stop.comfyui":
+        emit(f"Stopped managed ComfyUI process (PID {stop_managed_process('comfyui')}).")
+    elif action_id == "start.ollama":
+        ollama = command_path("ollama")
+        if not ollama:
+            raise SystemExit("Ollama executable was not found.")
+        pid, log = start_managed_process("ollama", [ollama, "serve"], None, ollama)
+        emit(f"Started Ollama (PID {pid}); log: {log}")
+        if not wait_for_http(ctx.ollama_host.rstrip("/") + "/api/tags", startup_timeout(10.0)):
+            emit("Ollama is still starting; check the log or rerun the utility shortly.")
+    elif action_id == "stop.ollama":
+        emit(f"Stopped managed Ollama process (PID {stop_managed_process('ollama')}).")
+    elif action_id == "start.blender":
+        blender = command_path(ctx.blender)
+        if not blender:
+            raise SystemExit("Blender executable was not found.")
+        pid, log = start_managed_process("blender", [blender], None, blender)
+        emit(f"Started Blender (PID {pid}); log: {log}")
+    elif action_id == "stop.blender":
+        emit(f"Stopped managed Blender process (PID {stop_managed_process('blender')}).")
+    elif action_id == "write.local.config":
         path = write_config(ctx)
         emit(f"Wrote {path}")
     elif action_id == "install.comfyui.helper":
@@ -789,22 +955,22 @@ def run_guided_setup(ctx: Context) -> None:
     run_checks(ctx)
     if ctx.json_output:
         return
+    if report(ctx)["ready"]:
+        print_ready_message()
+        return
     print_setup_guidance(ctx)
     if ctx.non_interactive or not sys.stdin.isatty():
         return
 
-    ready_actions = [action for action in ctx.actions if action.mutates and action.ready]
+    ready_actions = [action for action in ctx.actions if _is_guided_action(ctx, action)]
     if not ready_actions:
-        return
-    answer = input("\nReview and apply ready setup actions now? [y/N] ").strip().lower()
-    if answer not in {"y", "yes"}:
         return
 
     applied: set[str] = set()
     while True:
         progress = False
         for action in list(ctx.actions):
-            if not action.mutates or not action.ready or action.id in applied:
+            if not _is_guided_action(ctx, action) or action.id in applied:
                 continue
             try:
                 confirm_action(ctx, action)
@@ -819,11 +985,29 @@ def run_guided_setup(ctx: Context) -> None:
             applied.add(action.id)
             progress = True
             reset_results(ctx)
+            ctx.quiet_checks = True
             run_checks(ctx)
-            print_setup_guidance(ctx)
+            ctx.quiet_checks = False
             break
         if not progress:
             break
+    if report(ctx)["ready"]:
+        print_ready_message()
+
+
+def print_ready_message() -> None:
+    print("\n✓ Build Me Godot is installed and ready.")
+    print("  Open your Godot project and enable the Build Me Godot addon.")
+
+
+def _is_guided_action(ctx: Context, action: Action) -> bool:
+    if not action.mutates or not action.ready or action.id.startswith("stop."):
+        return False
+    if action.id == "start.blender":
+        return False
+    if action.id == "start.ollama" and not ctx.ollama_models:
+        return False
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:

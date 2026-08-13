@@ -100,3 +100,25 @@
 - [ ] 8.6 Add tests for guidance artifact creation, agent-readable changed
   paths, and failure cases when approved references or rigged meshes are
   missing.
+
+## 9. Baseline Facial Authoring
+
+- [x] 9.1 Preserve the original Quaternius male and female body rigs and create
+  duplicate-only Rigify facial-authoring experiments in `field_engineers.blend`.
+- [x] 9.2 Enable Blender's bundled Rigify explicitly, generate male and female
+  control rigs, and record dependency/license status without adding a runtime
+  Godot dependency.
+- [x] 9.3 Align generated face controls to the duplicate QTR rigs using body
+  height, QTR `Head` X/Y anchoring, and `ORG-face` Z anchoring.
+- [x] 9.4 Repair duplicated mesh Armature modifiers so they target duplicate
+  QTR rigs while the original meshes continue targeting the original rigs.
+- [x] 9.5 Limit visible Rigify collections to facial authoring controls and tag
+  the generated full rigs as authoring-only and excluded from production export.
+- [ ] 9.6 Fit male and female facial metarig landmarks to brows, eyelids, eyes,
+  cheeks, nose, lips, jaw, ears, teeth, and tongue with artist review.
+- [ ] 9.7 Add reviewed facial deformation weights or morph targets without
+  replacing existing QTR body weights or production topology.
+- [ ] 9.8 Add a rest-space face attachment from the fitted Rigify face chain to
+  QTR `Head`; do not parent the complete Rigify object to an animated head bone.
+- [ ] 9.9 Add blink, jaw-open, smile, frown, brow-raise, and eye-look validation
+  poses, then define a deformation-only glTF/Godot export contract.

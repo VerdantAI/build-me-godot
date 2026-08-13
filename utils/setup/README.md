@@ -28,6 +28,12 @@ utils/check-local-requirements.sh apply install.comfyui.helper --yes --json
 utils/check-local-requirements.sh apply download.models --yes --json
 utils/check-local-requirements.sh apply move.models --yes --json
 utils/check-local-requirements.sh apply link.example.addon --yes --json
+utils/check-local-requirements.sh apply start.comfyui --yes --json
+utils/check-local-requirements.sh apply stop.comfyui --yes --json
+utils/check-local-requirements.sh apply start.ollama --yes --json
+utils/check-local-requirements.sh apply stop.ollama --yes --json
+utils/check-local-requirements.sh apply start.blender --yes --json
+utils/check-local-requirements.sh apply stop.blender --yes --json
 ```
 
 Do not run `apply` actions unless the user has approved the specific action ID.
@@ -36,6 +42,12 @@ operation and ask before proceeding. Model downloads are staged first; moving
 them into ComfyUI is a separate action. Terminal downloads show a progress bar;
 `--json` keeps progress output silent for agents. Incomplete downloads use a
 `.part` suffix and are removed after cancellation or failure.
+
+Start actions launch the configured application in the background and write a
+PID record and log beneath the user's runtime directory (or `/tmp`). Matching
+stop actions are offered only for a live process started by this utility; the
+assistant never terminates an independently started ComfyUI, Ollama, or Blender
+process.
 
 Human output includes review sections for missing ComfyUI custom node classes
 and model downloads. Model reviews include the declared license, source

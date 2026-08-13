@@ -17,9 +17,16 @@ func _run() -> void:
 	await process_frame
 	if not _check(dock.prompt.text.contains("neutral A-pose"), "dock default prompt was not populated"): return
 	if not _check(dock.negative_prompt.text.contains("cropped head"), "dock default negative prompt was not populated"): return
-	if not _check(dock.example_scene_path.text == "res://scenes/main.tscn", "dock default example scene was not populated"): return
+	if not _check(dock.example_scene_path.text == "res://scenes/base_characters.tscn", "dock default base character scene was not populated"): return
 	if not _check(dock.status_indicators.has("comfyui.reachable"), "dock did not create the ComfyUI running indicator"): return
 	if not _check(dock.status_indicators.has("ollama.running"), "dock did not create the Ollama running indicator"): return
+	dock._begin_dependency_check(false)
+	if not _check(dock.dependency_check_button.disabled, "dependency button was not disabled while checking"): return
+	if not _check(dock.status_indicators["comfyui.nodes"].value.text.contains("Checking"), "ComfyUI node status did not show the spinner state"): return
+	dock._advance_dependency_spinner()
+	if not _check(dock.dependency_status.text.contains("Checking local environment"), "dependency summary did not show the spinner state"): return
+	dock._end_dependency_check()
+	if not _check(not dock.dependency_check_button.disabled and dock.dependency_check_button.text == "Check dependencies", "dependency button was not restored after checking"): return
 
 	dock.character_id.text = "Dock Smoke"
 	dock.display_name.text = "Dock Smoke"

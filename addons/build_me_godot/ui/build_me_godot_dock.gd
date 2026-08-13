@@ -26,11 +26,12 @@ class StatusIndicatorDot:
 
 const DEFAULT_PROMPT := "Full-body game character reference of a practical field engineer and surveyor, sturdy work boots, durable work trousers, canvas work jacket, utility belt, functional realistic clothing construction, neutral A-pose, arms approximately 30 degrees away from the torso, feet shoulder-width apart, neutral expression, straight posture, complete head and feet visible, centered, minimal perspective distortion, approximately orthographic character-development reference, uniform diffuse studio lighting, plain neutral light gray background, clothing seams and construction clearly visible, no props obscuring the body."
 const DEFAULT_NEGATIVE_PROMPT := "cropped head, cropped feet, missing limbs, extra limbs, crossed arms, crossed legs, action pose, contrapposto, foreshortening, wide angle, perspective distortion, dramatic lighting, hard cast shadow, cluttered background, handheld props, text, watermark"
-const DEFAULT_EXAMPLE_SCENE := "res://scenes/main.tscn"
+const DEFAULT_EXAMPLE_SCENE := "res://scenes/base_characters.tscn"
 const INDICATOR_PASS := Color("43a047")
 const INDICATOR_FAIL := Color("d64545")
 const INDICATOR_WARNING := Color("d6a21f")
 const INDICATOR_UNKNOWN := Color("6f7378")
+const SPINNER_FRAMES := ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 var store := CharacterStore.new()
 var character_select: OptionButton
@@ -64,6 +65,12 @@ var pending_generation_version := ""
 var run_select: OptionButton
 var reference_preview: TextureRect
 var run_details: RichTextLabel
+var dependency_check_button: Button
+var deep_check_button: Button
+var dependency_spinner: Timer
+var dependency_spinner_frame := 0
+var dependency_check_in_progress := false
+var open_example_scene_button: Button
 
 
 func _ready() -> void:
@@ -143,16 +150,29 @@ func _build_ui() -> void:
 	_add_status_indicator(status_grid, "ollama.executable", "Ollama found")
 	_add_status_indicator(status_grid, "ollama.running", "Ollama running")
 	_add_status_indicator(status_grid, "animation.asset", "Animation asset")
-	_add_status_indicator(status_grid, "example.scene", "Example scene")
+	_add_status_indicator(status_grid, "example.scene", "Base character scene")
+	dependency_check_button = Button.new()
+	dependency_check_button.text = "Check dependencies"
+	dependency_check_button.pressed.connect(_check_dependencies)
+	setup_tab.add_child(dependency_check_button)
+	deep_check_button = Button.new()
+	deep_check_button.text = "Deep-check Blender"
+	deep_check_button.tooltip_text = "Starts Blender in background mode and verifies the builder operators"
+	deep_check_button.pressed.connect(_deep_check_dependencies)
+	setup_tab.add_child(deep_check_button)
+	dependency_spinner = Timer.new()
+	dependency_spinner.wait_time = 0.1
+	dependency_spinner.timeout.connect(_advance_dependency_spinner)
+	add_child(dependency_spinner)
 
 	primary_rigged_mesh = _add_line_edit(setup_tab, "Primary rigged mesh", CharacterStore.DEFAULT_PRIMARY_RIGGED_MESH)
 	secondary_rigged_mesh = _add_line_edit(setup_tab, "Secondary rigged mesh", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH)
-	example_scene_path = _add_line_edit(setup_tab, "Example scene", DEFAULT_EXAMPLE_SCENE)
+	example_scene_path = _add_line_edit(setup_tab, "Base character scene", DEFAULT_EXAMPLE_SCENE)
 	example_scene_path.text = DEFAULT_EXAMPLE_SCENE
 	var scene_buttons := HBoxContainer.new()
-	var open_example_scene_button := Button.new()
-	open_example_scene_button.text = "Open example scene"
-	open_example_scene_button.tooltip_text = "Open the project scene used to inspect the rigged mesh inputs"
+	open_example_scene_button = Button.new()
+	open_example_scene_button.text = "Load base character scene"
+	open_example_scene_button.tooltip_text = "Load the scene containing the base mannequin characters to be skinned"
 	open_example_scene_button.pressed.connect(_open_example_scene)
 	scene_buttons.add_child(open_example_scene_button)
 	setup_tab.add_child(scene_buttons)
@@ -176,15 +196,6 @@ func _build_ui() -> void:
 	configuration_status = Label.new()
 	configuration_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	setup_tab.add_child(configuration_status)
-	var probe_button := Button.new()
-	probe_button.text = "Check dependencies"
-	probe_button.pressed.connect(_check_dependencies)
-	setup_tab.add_child(probe_button)
-	var deep_probe_button := Button.new()
-	deep_probe_button.text = "Deep-check Blender"
-	deep_probe_button.tooltip_text = "Starts Blender in background mode and verifies the builder operators"
-	deep_probe_button.pressed.connect(_deep_check_dependencies)
-	setup_tab.add_child(deep_probe_button)
 	var report_buttons := HBoxContainer.new()
 	var copy_report_button := Button.new()
 	copy_report_button.text = "Copy report"
@@ -349,6 +360,10 @@ func _refresh_static_status_indicators() -> void:
 	else:
 		var scene_found := FileAccess.file_exists(scene_text)
 		_set_status_indicator("example.scene", "pass" if scene_found else "fail", "Yes" if scene_found else "No")
+		if open_example_scene_button:
+			var edited_root := EditorInterface.get_edited_scene_root()
+			var current_path := edited_root.scene_file_path if edited_root else ""
+			open_example_scene_button.text = "Base character scene loaded" if current_path == scene_text else "Load base character scene"
 
 
 func _update_status_indicators_from_report(report: Dictionary, ollama: Dictionary) -> void:
@@ -667,11 +682,18 @@ func _open_example_scene() -> void:
 		path = DEFAULT_EXAMPLE_SCENE
 	if not FileAccess.file_exists(path):
 		_refresh_static_status_indicators()
-		_set_status("Example scene not found: %s" % path, true)
+		_set_status("Base character scene not found: %s" % path, true)
+		return
+	var edited_root := EditorInterface.get_edited_scene_root()
+	if edited_root and edited_root.scene_file_path == path:
+		EditorInterface.set_main_screen_editor("3D")
+		_refresh_static_status_indicators()
+		_set_status("Base character scene is already loaded: %s" % path)
 		return
 	EditorInterface.open_scene_from_path(path)
+	EditorInterface.set_main_screen_editor("3D")
 	_refresh_static_status_indicators()
-	_set_status("Opened %s" % path)
+	_set_status("Loaded base character scene: %s" % path)
 
 
 func _load_configuration() -> void:
@@ -719,14 +741,9 @@ func _deep_check_dependencies() -> void:
 
 
 func _run_environment_check(deep_check: bool) -> void:
-	dependency_status.text = "Checking local environment…"
-	_refresh_static_status_indicators()
-	_set_status_indicator("blender.executable", "unknown", "Checking")
-	_set_status_indicator("comfyui.reachable", "unknown", "Checking")
-	_set_status_indicator("comfyui.nodes", "unknown", "Checking")
-	_set_status_indicator("comfyui.models", "unknown", "Checking")
-	_set_status_indicator("ollama.executable", "unknown", "Checking")
-	_set_status_indicator("ollama.running", "unknown", "Checking")
+	if dependency_check_in_progress:
+		return
+	_begin_dependency_check(deep_check)
 	var report: Dictionary = await environment_checker.check("all", {
 		"comfyui_url": comfyui_url.text,
 		"comfyui_root": comfyui_root.text,
@@ -739,6 +756,37 @@ func _run_environment_check(deep_check: bool) -> void:
 	last_environment_report = report
 	_render_environment_report()
 	_update_status_indicators_from_report(report, ollama)
+	_end_dependency_check()
+
+
+func _begin_dependency_check(deep_check: bool) -> void:
+	dependency_check_in_progress = true
+	dependency_spinner_frame = 0
+	dependency_check_button.disabled = true
+	deep_check_button.disabled = true
+	dependency_check_button.text = "Checking dependencies…"
+	deep_check_button.text = "Deep-checking Blender…" if deep_check else "Deep-check Blender"
+	dependency_spinner.start()
+	_advance_dependency_spinner()
+
+
+func _advance_dependency_spinner() -> void:
+	if not dependency_check_in_progress:
+		return
+	var frame: String = SPINNER_FRAMES[dependency_spinner_frame % SPINNER_FRAMES.size()]
+	dependency_spinner_frame += 1
+	dependency_status.text = "%s Checking local environment…" % frame
+	for id in status_indicators:
+		_set_status_indicator(id, "unknown", "%s Checking" % frame)
+
+
+func _end_dependency_check() -> void:
+	dependency_check_in_progress = false
+	dependency_spinner.stop()
+	dependency_check_button.disabled = false
+	deep_check_button.disabled = false
+	dependency_check_button.text = "Check dependencies"
+	deep_check_button.text = "Deep-check Blender"
 
 
 func _probe_ollama() -> Dictionary:

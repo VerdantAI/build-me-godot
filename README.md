@@ -64,7 +64,7 @@ The intended loop is:
 6. Explicitly continue the downstream pipeline. This writes `blender/<version>/reference_inputs.json` for Blender automation and advances the manifest stage.
 7. Register the final Godot scene, animations, and secondary assets back into the same character manifest when downstream work completes.
 
-The setup tab shows Godot-style local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the example scene. The example scene field defaults to `res://scenes/main.tscn`; use **Open example scene** when a consuming project provides that scene for rigged mesh inspection.
+The setup tab shows Godot-style local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the base character scene. The scene field defaults to `res://scenes/base_characters.tscn`; use **Load base character scene** when a consuming project provides that scene with its mannequin characters for rigged-mesh inspection. This is separate from the project's normal `main.tscn` entry scene.
 
 Headless agents can inspect and apply approved manifest transitions without running external setup or downloads:
 
@@ -144,9 +144,14 @@ PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
   tests/mock_comfyui_server.py \
   addons/build_me_godot/integrations/comfyui/character_turnaround_output.py \
   addons/build_me_godot/integrations/blender/build_humanoid_character.py \
-  addons/build_me_godot/integrations/blender/validate_deformation.py
+  addons/build_me_godot/integrations/blender/validate_deformation.py \
+  build_me_godot/blender/tools/prepare_rigify_face_experiment.py \
+  build_me_godot/blender/tools/fit_rigify_face_baseline.py \
+  build_me_godot/blender/tools/generate_rigify_face_controls.py \
+  build_me_godot/blender/tools/integrate_rigify_face_layer.py
 bash tests/test_environment_cli.sh
 bash tests/test_local_tools.sh
+bash tests/test_setup_services.sh
 bash tests/test_repository_separation.sh
 openspec validate add-installation-environment-utilities --strict
 ```
