@@ -27,6 +27,7 @@ utils/check-local-requirements.sh apply write.local.config --yes --json
 utils/check-local-requirements.sh apply install.comfyui.helper --yes --json
 utils/check-local-requirements.sh apply download.models --yes --json
 utils/check-local-requirements.sh apply move.models --yes --json
+utils/check-local-requirements.sh apply link.example.addon --yes --json
 ```
 
 Do not run `apply` actions unless the user has approved the specific action ID.
@@ -42,6 +43,12 @@ repository, download URL, staging path, and target ComfyUI model directory.
 If the Build Me Godot helper file exists but ComfyUI has not loaded its node
 classes, setup offers `refresh.comfyui.helper`; restart ComfyUI after running
 that action.
+
+When the companion `godot-addons-example-project` is present next to this
+repository, setup checks whether its `addons/build_me_godot` path is a symlink
+to this checkout. If it is missing, `link.example.addon` offers to create the
+development symlink. Override the project location with
+`--example-project /path/to/project` or `BUILD_ME_GODOT_EXAMPLE_PROJECT`.
 
 Machine-readable reports include:
 

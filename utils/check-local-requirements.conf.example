@@ -13,6 +13,11 @@ BUILD_ME_GODOT_MODEL_DOWNLOAD_DIR='/home/you/Downloads/build-me-godot-models'
 # Blender executable path or command name.
 BUILD_ME_GODOT_BLENDER_PATH='blender'
 
+# Optional companion example project. The setup assistant can create a local
+# development symlink from this project's addons/build_me_godot to the addon
+# checkout in this repository.
+BUILD_ME_GODOT_EXAMPLE_PROJECT='/home/you/verdant/godot-addons-example-project'
+
 # Optional Ollama settings. Separate multiple models with spaces.
 BUILD_ME_GODOT_OLLAMA_HOST='http://127.0.0.1:11434'
 BUILD_ME_GODOT_OLLAMA_MODELS_DIR='/home/you/.ollama/models'

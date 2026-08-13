@@ -17,6 +17,8 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ADDON_SOURCE = PROJECT_ROOT / "addons" / "build_me_godot"
+DEFAULT_EXAMPLE_PROJECT = PROJECT_ROOT.parent / "godot-addons-example-project"
 DEFAULT_CONFIG = PROJECT_ROOT / "utils" / "check-local-requirements.local.conf"
 EXAMPLE_CONFIG = PROJECT_ROOT / "utils" / "check-local-requirements.conf.example"
 HELPER_SOURCE = PROJECT_ROOT / "addons" / "build_me_godot" / "integrations" / "comfyui" / "character_turnaround_output.py"
@@ -92,6 +94,7 @@ class Context:
     ollama_host: str
     ollama_models_dir: Path
     ollama_models: list[str]
+    example_project: Path
     json_output: bool
     assume_yes: bool
     non_interactive: bool
@@ -250,6 +253,7 @@ def build_context(args: argparse.Namespace) -> Context:
     configured_models = setting("BUILD_ME_GODOT_OLLAMA_MODELS", "")
     ollama_models = configured_models.split() if configured_models else []
     ollama_models.extend(args.ollama_model or [])
+    example_project = Path(args.example_project or setting("BUILD_ME_GODOT_EXAMPLE_PROJECT", str(DEFAULT_EXAMPLE_PROJECT))).expanduser()
 
     return Context(
         config_path=config_path,
@@ -261,6 +265,7 @@ def build_context(args: argparse.Namespace) -> Context:
         ollama_host=ollama_host,
         ollama_models_dir=ollama_models_dir,
         ollama_models=ollama_models,
+        example_project=example_project,
         json_output=bool(args.json),
         assume_yes=bool(args.yes),
         non_interactive=bool(args.non_interactive),
@@ -287,7 +292,7 @@ def reset_results(ctx: Context) -> None:
 
 def run_checks(ctx: Context) -> None:
     add_check(ctx, Check("project.file", "ok" if (PROJECT_ROOT / "project.godot").exists() else "missing", "Godot project file"))
-    add_check(ctx, Check("addon.source", "ok" if (PROJECT_ROOT / "addons" / "build_me_godot").is_dir() else "missing", "Build Me Godot addon source"))
+    add_check(ctx, Check("addon.source", "ok" if ADDON_SOURCE.is_dir() else "missing", "Build Me Godot addon source"))
 
     godot = command_path("godot")
     add_check(ctx, Check("tool.godot", "ok" if godot else "missing", f"Godot executable: {godot or 'missing'}", details={"path": godot}))
@@ -366,9 +371,59 @@ def run_checks(ctx: Context) -> None:
     else:
         add_check(ctx, Check("ollama.models", "skip", "Ollama models not requested", required=False))
 
+    check_example_project(ctx)
+
     if not ctx.config_path.exists():
         add_action(ctx, Action("write.local.config", "Write reusable gitignored local setup config.", True, details={"target": str(ctx.config_path)}))
     add_action(ctx, Action("open.comfy", "Print the configured ComfyUI URL for opening in a browser.", False, details={"url": ctx.comfyui_url}))
+
+
+def check_example_project(ctx: Context) -> None:
+    example = ctx.example_project
+    addon_target = example / "addons" / "build_me_godot"
+    details = {
+        "project": str(example),
+        "target": str(addon_target),
+        "source": str(ADDON_SOURCE),
+    }
+    if not (example / "project.godot").exists():
+        add_check(ctx, Check(
+            "example.project",
+            "skip",
+            f"Companion example project not found: {example}",
+            required=False,
+            details=details,
+        ))
+        return
+
+    if addon_target.is_symlink():
+        actual = addon_target.resolve()
+        details["actual"] = str(actual)
+        if actual == ADDON_SOURCE.resolve():
+            add_check(ctx, Check("example.addon.symlink", "ok", "Example project Build Me Godot addon symlink", required=False, details=details))
+        else:
+            add_check(ctx, Check("example.addon.symlink", "warning", "Example project addon symlink points elsewhere", required=False, details=details))
+            add_action(ctx, Action(
+                "link.example.addon",
+                "Replace the example project's Build Me Godot addon symlink with this checkout.",
+                True,
+                details=details | {"replace_existing_symlink": True},
+            ))
+        return
+
+    if addon_target.exists():
+        add_check(ctx, Check("example.addon.symlink", "warning", "Example project addon path exists but is not a symlink", required=False, details=details))
+        add_action(ctx, Action(
+            "link.example.addon",
+            "Create the example project Build Me Godot addon symlink.",
+            True,
+            ready=False,
+            details=details | {"blocked_by_existing_path": True},
+        ))
+        return
+
+    add_check(ctx, Check("example.addon.symlink", "missing", "Example project Build Me Godot addon symlink", required=False, details=details))
+    add_action(ctx, Action("link.example.addon", "Create the example project Build Me Godot addon symlink.", True, details=details))
 
 
 def write_config(ctx: Context) -> Path:
@@ -386,6 +441,7 @@ def write_config(ctx: Context) -> Path:
         f"BUILD_ME_GODOT_OLLAMA_HOST={shell_value(ctx.ollama_host)}",
         f"BUILD_ME_GODOT_OLLAMA_MODELS_DIR={shell_value(str(ctx.ollama_models_dir))}",
         f"BUILD_ME_GODOT_OLLAMA_MODELS={shell_value(models)}",
+        f"BUILD_ME_GODOT_EXAMPLE_PROJECT={shell_value(str(ctx.example_project))}",
         "",
         "# ComfyUI model placement guide:",
         "# text encoders: $BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/",
@@ -484,6 +540,17 @@ def action_detail_lines(action: Action) -> list[str]:
         lines = [f"Move {len(staged)} staged model file(s) into ComfyUI model directories."]
         lines.extend(f"- {row.get('staged_path', '')} -> {row.get('target_dir', '')}" for row in staged)
         return lines
+    if action.id == "link.example.addon":
+        lines = [
+            f"Example project: {details.get('project', '')}",
+            f"Symlink target: {details.get('target', '')}",
+            f"Symlink source: {details.get('source', '')}",
+        ]
+        if details.get("replace_existing_symlink"):
+            lines.append("Existing symlink will be replaced.")
+        if details.get("blocked_by_existing_path"):
+            lines.append("Blocked because the target path exists and is not a symlink.")
+        return lines
     if action.id.startswith("pull.ollama."):
         return [f"Run: ollama pull {details.get('model', action.id.removeprefix('pull.ollama.'))}"]
     return [action.summary]
@@ -576,6 +643,22 @@ def execute_action(ctx: Context, action_id: str) -> None:
             emit(f"Moved {target}")
         if moved == 0:
             raise SystemExit("No staged model files were found to move.")
+    elif action_id == "link.example.addon":
+        example = ctx.example_project
+        if not (example / "project.godot").exists():
+            raise SystemExit(f"Example project not found: {example}")
+        target = example / "addons" / "build_me_godot"
+        if target.exists() or target.is_symlink():
+            if not target.is_symlink():
+                raise SystemExit(f"Refusing to overwrite non-symlink path: {target}")
+            if target.resolve() == ADDON_SOURCE.resolve():
+                emit(f"Already linked: {target} -> {ADDON_SOURCE}")
+                return
+            target.unlink()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.symlink_to(ADDON_SOURCE)
+        ctx.changed_paths.append(str(target))
+        emit(f"Linked {target} -> {ADDON_SOURCE}")
     elif action_id.startswith("pull.ollama."):
         model = action_id.removeprefix("pull.ollama.")
         subprocess.run(["ollama", "pull", model], check=True)
@@ -612,6 +695,7 @@ def report(ctx: Context) -> dict[str, Any]:
         "comfyui_url": ctx.comfyui_url,
         "comfyui_root": str(ctx.comfyui_root) if ctx.comfyui_root else "",
         "model_download_dir": str(ctx.model_download_dir),
+        "example_project": str(ctx.example_project),
         "checks": [check.__dict__ for check in ctx.checks],
         "actions": [action.__dict__ for action in ctx.actions],
         "changed_paths": ctx.changed_paths,
@@ -749,6 +833,7 @@ the user has approved the specific action ID shown in the plan output.
     parser.add_argument("--comfyui-root")
     parser.add_argument("--blender")
     parser.add_argument("--model-download-dir")
+    parser.add_argument("--example-project")
     parser.add_argument("--ollama-model", action="append")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--yes", action="store_true", help="Apply the selected action without prompting after explicit approval.")

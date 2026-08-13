@@ -91,7 +91,7 @@ The helper can also write a reusable, gitignored local config:
 utils/check-local-requirements.sh apply write.local.config
 ```
 
-Use [utils/check-local-requirements.conf.example](utils/check-local-requirements.conf.example) as the checked-in template. The generated `utils/check-local-requirements.local.conf` records ComfyUI URL/root, model staging directory, Blender executable, and Ollama host/model paths for later runs. Pass overrides such as `--comfyui-root "$HOME/src/ComfyUI"` or `--ollama-model llama3.1:8b` when needed.
+Use [utils/check-local-requirements.conf.example](utils/check-local-requirements.conf.example) as the checked-in template. The generated `utils/check-local-requirements.local.conf` records ComfyUI URL/root, model staging directory, Blender executable, companion example project path, and Ollama host/model paths for later runs. Pass overrides such as `--comfyui-root "$HOME/src/ComfyUI"`, `--example-project "$HOME/verdant/godot-addons-example-project"`, or `--ollama-model llama3.1:8b` when needed.
 
 The helper is a Python setup app with a shell wrapper. Use `check` for read-only diagnostics, `doctor` for human-readable details, `plan --json` to hand setup to an agent, and `apply <action_id>` for explicit mutations:
 
@@ -102,9 +102,10 @@ utils/check-local-requirements.sh plan --json
 utils/check-local-requirements.sh apply install.comfyui.helper
 utils/check-local-requirements.sh apply download.models
 utils/check-local-requirements.sh apply move.models
+utils/check-local-requirements.sh apply link.example.addon
 ```
 
-The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, pulls Ollama models, or writes config. Mutating `apply` commands explain the planned change and ask for confirmation by default; use `--yes` only after a specific action has already been approved for non-interactive or JSON automation.
+The helper checks for common local requirements such as Godot, Blender, ComfyUI reachability, the Build Me Godot ComfyUI helper node, declared workflow model filenames, the companion example-project addon symlink, and explicitly requested Ollama models. If `--comfyui-root` is omitted, it tries to infer the root from the running local ComfyUI process. `check` and `plan` are read-only; only `apply <action_id>` installs helpers, downloads model files, moves staged files, links the example project, pulls Ollama models, or writes config. Mutating `apply` commands explain the planned change and ask for confirmation by default; use `--yes` only after a specific action has already been approved for non-interactive or JSON automation.
 
 If the Build Me Godot helper file exists but ComfyUI has not loaded its node classes, the helper offers `refresh.comfyui.helper`; restart ComfyUI after running it.
 
