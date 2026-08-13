@@ -15,7 +15,10 @@ This table records reviewed components and whether Build Me Godot redistributes 
 | Blender | `blender/blender` | GPL-2.0-or-later | User output unaffected | Yes | No | Independent authoring and automated processing tool. |
 | Burb Sweeper humanoid scripts | Inhuman Entertainment Burb Sweeper | MIT | N/A | Yes | Generalized source | Original project-specific paths and asset assumptions removed. |
 | Gator Model Studio 1.0.1 | Godot Asset Store, Blackwater Gator Studios | MIT | N/A | Yes | No | Optional in-Godot last-mile refinement solution. |
-| Quaternius Universal Animation Library Standard | Quaternius | N/A | CC0-1.0 | Yes | No | Tested animation source; obtain independently and record its path. |
+| Burning Barb Prototyping Mannequin | `burning-barb.itch.io/mannequin` | N/A | CC0-1.0 | Yes | Local workflow assets | Included under `build_me_godot/blender/assets/` for reusable mannequin experiments; not part of the Asset Store addon package. |
+| Godot 3D Male Base Mesh | GitHub archive retained under `build_me_godot/blender/assets/downloads/` | N/A | CC0-1.0 | Yes | Local workflow assets | Included for Blender workflow reference and prototyping; not part of the Asset Store addon package. |
+| Kenney Animated Characters 1 | Kenney / OpenGameArt distribution | N/A | CC0-1.0 | Yes | Local workflow assets | Included under `build_me_godot/blender/assets/` for rig, animation, and texture experiments; not part of the Asset Store addon package. |
+| Quaternius Universal Animation Library Standard | Quaternius | N/A | CC0-1.0 | Yes | Local workflow assets | Included under `build_me_godot/blender/assets/` as the current humanoid base and animation source; not part of the Asset Store addon package. |
 | TripoSR | `VAST-AI-Research/TripoSR` at `107cefdc244c39106fa830359024f6a2f1c78871`; `stabilityai/TripoSR` revision `5b521936b01fbe1890f6f9baed0254ab6351c04a` | MIT | MIT | Yes | Adapter only | Optional user-managed local provider. No checkout, environment, or weights are bundled or installed automatically. |
 | Zero123++ | `sudo-ai/zero123plus` distributions | Apache lineage | Non-commercial or unclear exact weights | No/unclear | No | Rejected. |
 | FLUX dev models | Black Forest Labs | Mixed code | Non-commercial model license | No | No | Rejected. |

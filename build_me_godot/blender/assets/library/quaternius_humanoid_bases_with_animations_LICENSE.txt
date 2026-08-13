@@ -1,0 +1,6 @@
+Quaternius Humanoid Bases with Animations
+
+Source: Quaternius_IK_Rigged by JamesonBradfield, built on Quaternius CC0 Superhero models and animations.
+Godot Asset Library: https://godotengine.org/asset-library/asset/5235
+Repository: https://codeberg.org/jamesonBradfield/Quaternius_IK_Rigged_with_animations
+License: CC0 1.0 Universal for the asset contents per README/LICENSE.

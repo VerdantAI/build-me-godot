@@ -1,0 +1,4 @@
+Prototyping Mannequin by burning_barb
+Source: https://burning-barb.itch.io/mannequin
+License: Creative Commons Zero v1.0 Universal (CC0)
+Downloaded for local Blender asset-library experimentation.

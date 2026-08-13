@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Quaternius IK Rigged — addon icon -->
+  <rect x="0" y="0" width="128" height="128" rx="22" fill="#1b1f27"/>
+  <rect x="2.5" y="2.5" width="123" height="123" rx="20" fill="none" stroke="#2f3744" stroke-width="3"/>
+
+  <!-- Skeleton bones -->
+  <g stroke="#e9eef5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- spine -->
+    <path d="M64 40 L64 76"/>
+    <!-- shoulders -->
+    <path d="M50 46 L78 46"/>
+    <!-- left arm -->
+    <path d="M50 46 L40 62 L36 80"/>
+    <!-- right arm -->
+    <path d="M78 46 L88 62 L92 80"/>
+    <!-- hips -->
+    <path d="M56 76 L72 76"/>
+    <!-- left leg -->
+    <path d="M56 76 L52 96 L50 113"/>
+    <!-- right leg -->
+    <path d="M72 76 L76 96 L78 113"/>
+  </g>
+
+  <!-- Head -->
+  <circle cx="64" cy="28" r="10" fill="#e9eef5"/>
+
+  <!-- Joints -->
+  <g fill="#9aa6b8">
+    <circle cx="64" cy="40" r="2.6"/>
+    <circle cx="50" cy="46" r="2.6"/>
+    <circle cx="78" cy="46" r="2.6"/>
+    <circle cx="40" cy="62" r="2.6"/>
+    <circle cx="88" cy="62" r="2.6"/>
+    <circle cx="56" cy="76" r="2.6"/>
+    <circle cx="72" cy="76" r="2.6"/>
+    <circle cx="52" cy="96" r="2.6"/>
+    <circle cx="76" cy="96" r="2.6"/>
+  </g>
+
+  <!-- Pole markers (TwoBoneIK pole vectors) -->
+  <g fill="#45c4b0">
+    <path d="M47 54 l4 4 l-4 4 l-4 -4 Z"/>
+    <path d="M81 54 l4 4 l-4 4 l-4 -4 Z"/>
+    <path d="M59 90 l4 4 l-4 4 l-4 -4 Z"/>
+    <path d="M69 90 l4 4 l-4 4 l-4 -4 Z"/>
+  </g>
+
+  <!-- IK target markers (hands + feet) -->
+  <g fill="#ffca3a" stroke="#1b1f27" stroke-width="1.5">
+    <path d="M36 72 l8 8 l-8 8 l-8 -8 Z"/>
+    <path d="M92 72 l8 8 l-8 8 l-8 -8 Z"/>
+    <path d="M50 105 l8 8 l-8 8 l-8 -8 Z"/>
+    <path d="M78 105 l8 8 l-8 8 l-8 -8 Z"/>
+  </g>
+</svg>

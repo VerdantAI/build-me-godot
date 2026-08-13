@@ -1,0 +1,22 @@
+# Normalize EOL for text files.
+* text=auto eol=lf
+
+# Binary assets — stored directly in git (no LFS), never EOL-normalized.
+*.glb   binary
+*.gltf  binary
+*.bin   binary
+*.fbx   binary
+*.obj   binary
+*.blend binary
+*.res   binary
+*.scn   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.exr   binary
+*.hdr   binary
+*.tga   binary
+*.wav   binary
+*.ogg   binary
+*.mp3   binary

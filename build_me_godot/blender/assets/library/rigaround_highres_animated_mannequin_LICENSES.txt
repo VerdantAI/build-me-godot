@@ -1,0 +1,9 @@
+Rigaround HighRes Animated Mannequin
+
+Mesh source: Prototyping Mannequin by burning_barb
+Source URL: https://burning-barb.itch.io/mannequin
+Mesh license: Creative Commons Zero v1.0 Universal (CC0)
+
+Rig and animations source: Kenney Animated Characters 1
+Source URL: https://opengameart.org/content/animated-characters-1
+Rig/animation license: CC0 as distributed with the downloaded pack.
