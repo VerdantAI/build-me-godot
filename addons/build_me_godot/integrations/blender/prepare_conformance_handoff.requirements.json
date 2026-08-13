@@ -10,21 +10,21 @@
   ],
   "configuration": {
     "required": ["project_root", "output_dir"],
-    "optional": ["conformance_plan", "mesh_guidance"]
+    "optional": ["conformance_plan", "mesh_guidance", "target_rig"]
   },
   "outputs": {
     "required_files": [
-      "conformance_handoff_report.json",
-      "conformance_guidance.json",
-      "{character_id}_{reference_version}_conformance_handoff.blend",
-      "overlays/front_silhouette_overlay.json",
-      "overlays/front_silhouette_overlay.svg",
-      "overlays/right_silhouette_overlay.json",
-      "overlays/right_silhouette_overlay.svg",
-      "overlays/back_silhouette_overlay.json",
-      "overlays/back_silhouette_overlay.svg"
+      "{target_rig}/conformance_handoff_report.json",
+      "{target_rig}/conformance_guidance.json",
+      "{target_rig}/{character_id}_{reference_version}_{target_rig}_conformance_handoff.blend",
+      "{target_rig}/overlays/front_silhouette_overlay.json",
+      "{target_rig}/overlays/front_silhouette_overlay.svg",
+      "{target_rig}/overlays/right_silhouette_overlay.json",
+      "{target_rig}/overlays/right_silhouette_overlay.svg",
+      "{target_rig}/overlays/back_silhouette_overlay.json",
+      "{target_rig}/overlays/back_silhouette_overlay.svg"
     ],
-    "report_required_fields": ["character_id", "reference_version", "pose_contract", "source_plan", "reference_images", "reference_meshes", "work_meshes", "validation_constraints", "alignment", "bounds", "silhouette_overlays", "guidance", "changed_paths"],
-    "guidance_required_fields": ["character_id", "reference_version", "pose_contract", "bounds", "clothing_shell_candidates", "prop_candidates", "material_targets", "color_targets", "validation_constraints", "changed_paths"]
+    "report_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "source_plan", "reference_images", "reference_meshes", "work_meshes", "validation_constraints", "alignment", "bounds", "silhouette_overlays", "guidance", "changed_paths"],
+    "guidance_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "bounds", "clothing_shell_candidates", "prop_candidates", "material_targets", "color_targets", "validation_constraints", "changed_paths"]
   }
 }

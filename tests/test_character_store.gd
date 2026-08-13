@@ -334,15 +334,18 @@ func _init() -> void:
 	var handoff_requirements = JSON.parse_string(handoff_requirements_file.get_as_text())
 	if not _check(handoff_requirements is Dictionary and handoff_requirements.pose_contract == "neutral_a_pose_30deg_v1", "conformance handoff requirements are malformed"): return
 	if not _check(handoff_requirements.configuration.optional.has("mesh_guidance"), "conformance handoff must accept mesh guidance input"): return
+	if not _check(handoff_requirements.configuration.optional.has("target_rig"), "conformance handoff must accept target rig isolation input"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("changed_paths"), "conformance handoff report must declare changed paths"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("target_rig"), "conformance handoff report must declare target rig"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("alignment"), "conformance handoff report must declare alignment metadata"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("bounds"), "conformance handoff report must declare bounds metadata"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("guidance"), "conformance handoff report must declare guidance path"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("silhouette_overlays"), "conformance handoff report must declare silhouette overlays"): return
+	if not _check(handoff_requirements.outputs.guidance_required_fields.has("target_rig"), "conformance guidance requirements must declare target rig"): return
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("clothing_shell_candidates"), "conformance guidance requirements must declare clothing candidates"): return
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("prop_candidates"), "conformance guidance requirements must declare prop candidates"): return
-	if not _check(handoff_requirements.outputs.required_files.has("conformance_guidance.json"), "conformance handoff requirements must declare guidance JSON"): return
-	if not _check(handoff_requirements.outputs.required_files.has("overlays/front_silhouette_overlay.svg"), "conformance handoff requirements must declare front overlay preview"): return
+	if not _check(handoff_requirements.outputs.required_files.has("{target_rig}/conformance_guidance.json"), "conformance handoff requirements must declare target-scoped guidance JSON"): return
+	if not _check(handoff_requirements.outputs.required_files.has("{target_rig}/overlays/front_silhouette_overlay.svg"), "conformance handoff requirements must declare target-scoped front overlay preview"): return
 	var fixture_file := FileAccess.open("res://tests/fixtures/environment_reports.json", FileAccess.READ)
 	if not _check(fixture_file != null, "environment fixtures could not be opened"): return
 	var fixtures = JSON.parse_string(fixture_file.get_as_text())
