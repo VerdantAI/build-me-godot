@@ -897,6 +897,16 @@ func _conformance_providers(values: Dictionary, manifest: Dictionary, version: S
 		"command": command,
 		"outputs": {}
 	})
+	providers.append({
+		"provider_id": "trellis",
+		"role": "experimental_proxy_reconstruction",
+		"status": "configured" if not command.is_empty() else "manual_setup_required",
+		"license_record": "TRELLIS",
+		"commercial_use": true,
+		"automatic_downloads_allowed": false,
+		"command": command,
+		"outputs": {}
+	})
 	var proxy_meshes: Dictionary = values.get("proxy_meshes", {})
 	if not proxy_meshes.is_empty():
 		providers.append({
@@ -984,8 +994,8 @@ func _proxy_attempt_report(provider_id: String, status: String, version: String,
 		"provider_id": provider_id,
 		"reference_version": version,
 		"role": "proxy_reconstruction",
-		"license_record": "TripoSR" if provider_id == "triposr" else "user_review_required",
-		"commercial_use": true if provider_id == "triposr" else "user_review_required",
+		"license_record": _provider_license_record(provider_id),
+		"commercial_use": _provider_commercial_use(provider_id),
 		"automatic_downloads_allowed": false,
 		"input": {
 			"view": str(input_selection.get("view", "")),
@@ -1007,8 +1017,8 @@ func _update_generated_proxy_provider(providers: Array, provider_id: String, com
 		"provider_id": provider_id,
 		"role": "proxy_reconstruction",
 		"status": "generated",
-		"license_record": "TripoSR" if provider_id == "triposr" else "user_review_required",
-		"commercial_use": true if provider_id == "triposr" else "user_review_required",
+		"license_record": _provider_license_record(provider_id),
+		"commercial_use": _provider_commercial_use(provider_id),
 		"automatic_downloads_allowed": false,
 		"command": command,
 		"inputs": {
@@ -1043,11 +1053,25 @@ func _packed_paths(value) -> PackedStringArray:
 
 
 func _allowed_conformance_provider_ids() -> PackedStringArray:
-	return PackedStringArray(["triposr", "external_proxy_mesh"])
+	return PackedStringArray(["triposr", "trellis", "external_proxy_mesh"])
 
 
 func _rejected_conformance_provider_ids() -> PackedStringArray:
 	return PackedStringArray(["stable_fast_3d", "hunyuan3d_2"])
+
+
+func _provider_license_record(provider_id: String) -> String:
+	match provider_id:
+		"triposr":
+			return "TripoSR"
+		"trellis":
+			return "TRELLIS"
+		_:
+			return "user_review_required"
+
+
+func _provider_commercial_use(provider_id: String):
+	return true if provider_id in ["triposr", "trellis"] else "user_review_required"
 
 
 func _field_engineer_targets(manifest: Dictionary, run: Dictionary) -> Dictionary:

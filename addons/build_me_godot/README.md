@@ -89,6 +89,16 @@ Python packages, download TripoSR weights, or copy checkpoints into ComfyUI. A
 direct `BUILD_ME_GODOT_RECONSTRUCTION_COMMAND` wrapper remains available as a
 fallback when the Comfy node path is not suitable.
 
+The optional TRELLIS path is experimental and intended for evaluating better
+local proxy meshes when TripoSR output is not useful. It requires a
+user-installed `microsoft/TRELLIS` checkout, a local
+`microsoft/TRELLIS-image-large` model folder, and a CUDA-compatible Python
+environment. Configure `BUILD_ME_GODOT_TRELLIS_ROOT`,
+`BUILD_ME_GODOT_TRELLIS_MODEL_PATH`, optionally
+`BUILD_ME_GODOT_TRELLIS_PYTHON`, then use `bash utils/run-trellis.sh` as the
+reconstruction command in this development repository. The wrapper runs Hugging
+Face in offline mode by default and never downloads weights automatically.
+
 Ollama can help with optional vision-language review of references and target
 JSON, but it is not used as the TripoSR wrapper. Ollama's supported model
 surface is LLM/vision inference, not arbitrary image-to-3D reconstruction
@@ -99,6 +109,14 @@ matching side/back references, keep the full body centered, normalize alpha or
 background before reconstruction, avoid occluded tools and cropped feet, keep
 view labels stable, prompt explicit safety workwear, and retain artist review
 before any downstream mesh edits.
+
+Rigging smoke tests bind generated proxy meshes to the local Quaternius
+humanoid rig only to prove GLB import, skinning, deformation, and animation
+export. The generated `Rig_Test` action is a deliberately small shoulder/limb
+motion; it is not a walk cycle. Full locomotion exposed donor-weight artifacts
+on generated clothing and accessories, so production use still requires better
+weights, accessory separation, or an AI rigger such as a separately reviewed
+Make-It-Animatable/UniRig setup.
 
 The packaged Blender handoff command
 `integrations/blender/prepare_conformance_handoff.py` reads a conformance plan

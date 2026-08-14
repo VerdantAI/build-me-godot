@@ -1,4 +1,4 @@
-[gd_resource type="AnimationLibrary" format=3]
+[gd_resource type="AnimationLibrary" format=3 uid="uid://dn74j8q6557dl"]
 
 [sub_resource type="Animation" id="Animation_4l31q"]
 resource_name = "A_TPose"

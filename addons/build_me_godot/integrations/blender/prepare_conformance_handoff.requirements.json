@@ -24,7 +24,7 @@
       "{target_rig}/overlays/back_silhouette_overlay.json",
       "{target_rig}/overlays/back_silhouette_overlay.svg"
     ],
-    "report_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "source_plan", "reference_images", "reference_meshes", "work_meshes", "validation_constraints", "alignment", "bounds", "silhouette_overlays", "guidance", "changed_paths"],
-    "guidance_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "bounds", "clothing_shell_candidates", "prop_candidates", "material_targets", "color_targets", "validation_constraints", "changed_paths"]
+    "report_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "source_plan", "reference_images", "reference_meshes", "work_meshes", "shell_guides", "validation_constraints", "alignment", "bounds", "silhouette_overlays", "guidance", "changed_paths"],
+    "guidance_required_fields": ["character_id", "reference_version", "target_rig", "target_rig_display_name", "pose_contract", "bounds", "shell_guides", "clothing_shell_candidates", "prop_candidates", "material_targets", "color_targets", "validation_constraints", "changed_paths"]
   }
 }

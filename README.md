@@ -84,6 +84,11 @@ godot --no-header --headless --path . --script res://addons/build_me_godot/cli/c
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer --workflow-path res://addons/build_me_godot/workflows/canonical_only_api.json
 ```
 
+Generated proxy meshes can be bound to the local Quaternius humanoid rig for a
+Blender/Godot import smoke test. The current `Rig_Test` action is a conservative
+deformation check, not a walk cycle. Full locomotion needs better weights or
+separated accessories before it is suitable for generated field-engineer meshes.
+
 ## Local setup utilities
 
 Run the local requirement helper from this repository when preparing a Linux workstation:
@@ -159,6 +164,7 @@ PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
   addons/build_me_godot/integrations/blender/build_humanoid_character.py \
   addons/build_me_godot/integrations/blender/validate_deformation.py \
   build_me_godot/blender/tools/prepare_rigify_face_experiment.py \
+  build_me_godot/blender/tools/rig_generated_proxy_with_quaternius.py \
   build_me_godot/blender/tools/fit_rigify_face_baseline.py \
   build_me_godot/blender/tools/generate_rigify_face_controls.py \
   build_me_godot/blender/tools/integrate_rigify_face_layer.py \

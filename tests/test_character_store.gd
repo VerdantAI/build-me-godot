@@ -219,7 +219,12 @@ func _init() -> void:
 	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/conformance/v2/reports/validation.json")), "validation report was not written"): return
 	if not _check(conformance.conformance_plan.validation_constraints.source_meshes_immutable, "immutable mesh constraint was not recorded"): return
 	if not _check(conformance.conformance_plan.field_engineer_targets.avoid.has("fused_tools"), "avoidance targets were not recorded"): return
-	if not _check(conformance.conformance_plan.providers.size() == 2, "manual proxy provider provenance was not recorded"): return
+	if not _check(conformance.conformance_plan.providers.size() >= 2, "manual proxy provider provenance was not recorded"): return
+	var manual_proxy_recorded := false
+	for provider in conformance.conformance_plan.providers:
+		if provider is Dictionary and str(provider.get("provider_id", "")) == "external_proxy_mesh":
+			manual_proxy_recorded = true
+	if not _check(manual_proxy_recorded, "manual proxy provider provenance was not recorded"): return
 	if not _check(conformance.changed_paths.has(test_root.path_join("characters/draft_character/conformance/v2/conformance_plan.json")), "conformance changed path was not reported"): return
 	if not _check(conformance.manifest.rigged_meshes == rigged_before, "conformance preparation changed rigged mesh slots"): return
 	if not _check(conformance.manifest.source_rig_contract == source_rig_contract_before, "conformance preparation changed source rig metadata"): return
@@ -337,11 +342,13 @@ func _init() -> void:
 	if not _check(handoff_requirements.configuration.optional.has("target_rig"), "conformance handoff must accept target rig isolation input"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("changed_paths"), "conformance handoff report must declare changed paths"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("target_rig"), "conformance handoff report must declare target rig"): return
+	if not _check(handoff_requirements.outputs.report_required_fields.has("shell_guides"), "conformance handoff report must declare shell guides"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("alignment"), "conformance handoff report must declare alignment metadata"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("bounds"), "conformance handoff report must declare bounds metadata"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("guidance"), "conformance handoff report must declare guidance path"): return
 	if not _check(handoff_requirements.outputs.report_required_fields.has("silhouette_overlays"), "conformance handoff report must declare silhouette overlays"): return
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("target_rig"), "conformance guidance requirements must declare target rig"): return
+	if not _check(handoff_requirements.outputs.guidance_required_fields.has("shell_guides"), "conformance guidance requirements must declare shell guides"): return
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("clothing_shell_candidates"), "conformance guidance requirements must declare clothing candidates"): return
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("prop_candidates"), "conformance guidance requirements must declare prop candidates"): return
 	if not _check(handoff_requirements.outputs.required_files.has("{target_rig}/conformance_guidance.json"), "conformance handoff requirements must declare target-scoped guidance JSON"): return

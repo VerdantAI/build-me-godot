@@ -28,6 +28,12 @@ BUILD_ME_GODOT_OLLAMA_MODELS='llama3.1:8b'
 BUILD_ME_GODOT_CONTAINER_CONFIG='/home/you/verdant/build-me-godot/utils/check-local-container.local.env'
 BUILD_ME_GODOT_CONTAINER_MODEL_ROOTS='/home/you/src/ComfyUI/models /home/you/Downloads/build-me-godot-models /home/you/.ollama/models'
 
+# Optional experimental TRELLIS local provider. These point at user-owned
+# installs; the setup assistant does not clone TRELLIS or download weights.
+BUILD_ME_GODOT_TRELLIS_ROOT='/home/you/src/TRELLIS'
+BUILD_ME_GODOT_TRELLIS_MODEL_PATH='/home/you/models/TRELLIS-image-large'
+BUILD_ME_GODOT_TRELLIS_PYTHON='/home/you/miniconda3/envs/trellis/bin/python'
+
 # ComfyUI model placement guide:
 # text encoders: $BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/
 # diffusion models: $BUILD_ME_GODOT_COMFYUI_ROOT/models/diffusion_models/

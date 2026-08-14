@@ -47,6 +47,7 @@ func check(capability: String, options: Dictionary) -> Array[Dictionary]:
 		))
 	if capability in ["all", "field_engineer_mesh_conformance"]:
 		checks.append(_triposr_conformance_check(str(options.get("reconstruction_command", "")).strip_edges()))
+		checks.append(_trellis_conformance_check(str(options.get("reconstruction_command", "")).strip_edges()))
 	if capability in ["all", "blender_humanoid_build"]:
 		var animation_asset := str(options.get("animation_asset", "")).strip_edges()
 		var animation_exists := not animation_asset.is_empty() and FileAccess.file_exists(animation_asset)
@@ -87,6 +88,45 @@ func _triposr_conformance_check(reconstruction_command: String) -> Dictionary:
 		"TripoSR proxy generation command is configured." if exit_code == 0 else "Configured TripoSR command did not pass its version probe; manual proxy import remains available.",
 		reconstruction_command, "User-managed TripoSR command", evidence,
 		PackedStringArray(["write.container.config", "install.manual.triposr.provider"])
+	)
+
+
+func _trellis_conformance_check(reconstruction_command: String) -> Dictionary:
+	var requirements_path := "res://addons/build_me_godot/integrations/reconstruction/trellis/trellis.requirements.json"
+	var requirements := _load_json(requirements_path)
+	var evidence := {
+		"requirements": requirements_path,
+		"provider_id": "trellis",
+		"provider_status": "experimental_user_managed_command",
+		"automatic_downloads_allowed": false,
+		"license_record": requirements.get("code_license", "MIT"),
+		"weight_license": requirements.get("weight_license", "MIT"),
+		"command_contract": requirements.get("build_me_godot_command_contract", {}),
+		"minimum_vram_gb": requirements.get("hardware", {}).get("minimum_vram_gb", 16)
+	}
+	var root := OS.get_environment("BUILD_ME_GODOT_TRELLIS_ROOT")
+	if root.is_empty():
+		root = OS.get_environment("TRELLIS_ROOT")
+	var model := OS.get_environment("BUILD_ME_GODOT_TRELLIS_MODEL_PATH")
+	evidence["trellis_root"] = root
+	evidence["model_path"] = model
+	if root.is_empty() or model.is_empty():
+		return EnvironmentReport.result(
+			"conformance.provider.trellis", "field_engineer_mesh_conformance", "warning", "optional",
+			"TRELLIS is not configured; set a user-managed checkout and local model path before evaluation.",
+			null, "Configured experimental TRELLIS command", evidence,
+			PackedStringArray(["install.manual.trellis.provider"])
+		)
+	var script := ProjectSettings.globalize_path("res://utils/run-trellis.sh")
+	var output := []
+	var exit_code := OS.execute("bash", [script, "--version"], output, true) if FileAccess.file_exists(script) else 1
+	return EnvironmentReport.result(
+		"conformance.provider.trellis", "field_engineer_mesh_conformance",
+		"pass" if exit_code == 0 else "warning", "optional",
+		"TRELLIS provider is configured." if exit_code == 0 else "TRELLIS provider configuration did not pass its version probe; manual proxy import remains available.",
+		reconstruction_command if not reconstruction_command.is_empty() else null,
+		"User-managed TRELLIS command", evidence,
+		PackedStringArray(["install.manual.trellis.provider"])
 	)
 
 

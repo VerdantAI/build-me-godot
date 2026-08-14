@@ -102,6 +102,18 @@ FLOWTY_TRIPOSR_NODE = {
     "required_node_classes": ["TripoSRModelLoader", "TripoSRSampler", "TripoSRViewer"],
 }
 
+TRELLIS_PROVIDER_WRAPPER = PROJECT_ROOT / "utils" / "run-trellis.sh"
+TRELLIS_REQUIREMENTS = ADDON_SOURCE / "integrations" / "reconstruction" / "trellis" / "trellis.requirements.json"
+TRELLIS_SOURCE = {
+    "repository": "microsoft/TRELLIS",
+    "url": "https://github.com/microsoft/TRELLIS",
+    "model_repository": "microsoft/TRELLIS-image-large",
+    "model_url": "https://huggingface.co/microsoft/TRELLIS-image-large",
+    "code_license": "MIT",
+    "weight_license": "MIT",
+    "minimum_vram_gb": 16,
+}
+
 
 @dataclass
 class Check:
@@ -135,6 +147,9 @@ class Context:
     example_project: Path
     container_config_path: Path
     container_model_roots: list[Path]
+    trellis_root: Path | None
+    trellis_model_path: Path | None
+    trellis_python: str
     json_output: bool
     assume_yes: bool
     non_interactive: bool
@@ -188,6 +203,8 @@ def first_command(names: list[str]) -> tuple[str, str] | None:
 def configured_model_roots(ctx: Context) -> list[Path]:
     roots: list[Path] = []
     roots.extend(ctx.container_model_roots)
+    if ctx.trellis_model_path:
+        roots.append(ctx.trellis_model_path)
     if ctx.comfyui_root:
         roots.append(ctx.comfyui_root / "models")
         roots.append(ctx.comfyui_root / "custom_nodes")
@@ -496,6 +513,33 @@ def load_required_nodes() -> list[str]:
     return sorted(nodes)
 
 
+def is_trellis_root(path: Path | None) -> bool:
+    if path is None:
+        return False
+    return (path / "trellis" / "pipelines").is_dir() and ((path / "setup.sh").exists() or (path / "app.py").exists())
+
+
+def trellis_model_ready(path: Path | None) -> bool:
+    if path is None or not path.exists():
+        return False
+    if path.is_file():
+        return True
+    return any((path / name).exists() for name in ["model_index.json", "pipeline.json", "config.json"]) or any(path.glob("*.safetensors"))
+
+
+def trellis_manual_commands(ctx: Context) -> list[str]:
+    root_arg = shlex.quote(str(ctx.trellis_root)) if ctx.trellis_root else "${HOME}/src/TRELLIS"
+    model_arg = shlex.quote(str(ctx.trellis_model_path)) if ctx.trellis_model_path else "${HOME}/.cache/huggingface/hub/models--microsoft--TRELLIS-image-large/snapshots/<revision>"
+    return [
+        "git clone --recursive https://github.com/microsoft/TRELLIS.git " + root_arg,
+        "cd " + root_arg + " && . ./setup.sh --new-env --basic --xformers --spconv --mipgaussian --kaolin --nvdiffrast",
+        "Download microsoft/TRELLIS-image-large from Hugging Face after reviewing the MIT model license.",
+        "export BUILD_ME_GODOT_TRELLIS_ROOT=" + root_arg,
+        "export BUILD_ME_GODOT_TRELLIS_MODEL_PATH=" + model_arg,
+        "export BUILD_ME_GODOT_RECONSTRUCTION_COMMAND='bash utils/run-trellis.sh'",
+    ]
+
+
 def model_url(artifact: dict[str, str]) -> str:
     key = (artifact["repository"], artifact["value"])
     return MODEL_URLS.get(key, f"https://huggingface.co/{artifact['repository']}/resolve/main/{artifact['value']}")
@@ -538,6 +582,9 @@ def build_context(args: argparse.Namespace) -> Context:
     container_config_path = Path(args.container_config or setting("BUILD_ME_GODOT_CONTAINER_CONFIG", str(DEFAULT_CONTAINER_CONFIG))).expanduser()
     configured_container_roots = setting("BUILD_ME_GODOT_CONTAINER_MODEL_ROOTS", "")
     container_model_roots = [Path(value).expanduser() for value in shlex.split(configured_container_roots)] if configured_container_roots else []
+    trellis_root_text = args.trellis_root or setting("BUILD_ME_GODOT_TRELLIS_ROOT", os.environ.get("TRELLIS_ROOT", ""))
+    trellis_model_text = args.trellis_model_path or setting("BUILD_ME_GODOT_TRELLIS_MODEL_PATH", "")
+    trellis_python = args.trellis_python or setting("BUILD_ME_GODOT_TRELLIS_PYTHON", "")
 
     return Context(
         config_path=config_path,
@@ -552,6 +599,9 @@ def build_context(args: argparse.Namespace) -> Context:
         example_project=example_project,
         container_config_path=container_config_path,
         container_model_roots=container_model_roots,
+        trellis_root=Path(trellis_root_text).expanduser() if trellis_root_text else None,
+        trellis_model_path=Path(trellis_model_text).expanduser() if trellis_model_text else None,
+        trellis_python=trellis_python,
         json_output=bool(args.json),
         assume_yes=bool(args.yes),
         non_interactive=bool(args.non_interactive),
@@ -847,6 +897,73 @@ def run_checks(ctx: Context) -> None:
         },
     ))
 
+    trellis_root_ok = is_trellis_root(ctx.trellis_root)
+    trellis_model_ok = trellis_model_ready(ctx.trellis_model_path)
+    add_check(ctx, Check(
+        "trellis.root",
+        "ok" if trellis_root_ok else "missing",
+        f"TRELLIS checkout: {ctx.trellis_root}" if trellis_root_ok else "TRELLIS checkout not configured",
+        required=False,
+        details={
+            "path": str(ctx.trellis_root) if ctx.trellis_root else "",
+            "source": TRELLIS_SOURCE["url"],
+            "license": TRELLIS_SOURCE["code_license"],
+            "expected": "microsoft/TRELLIS checkout with trellis/pipelines",
+            "automatic_install_allowed": False,
+        },
+    ))
+    add_check(ctx, Check(
+        "trellis.model",
+        "ok" if trellis_model_ok else "missing",
+        f"TRELLIS image model folder: {ctx.trellis_model_path}" if trellis_model_ok else "TRELLIS image model folder not configured",
+        required=False,
+        details={
+            "path": str(ctx.trellis_model_path) if ctx.trellis_model_path else "",
+            "source": TRELLIS_SOURCE["model_url"],
+            "license": TRELLIS_SOURCE["weight_license"],
+            "expected": "local microsoft/TRELLIS-image-large folder",
+            "automatic_downloads_allowed": False,
+        },
+    ))
+    trellis_provider_ok = trellis_root_ok and trellis_model_ok and TRELLIS_PROVIDER_WRAPPER.is_file()
+    add_check(ctx, Check(
+        "trellis.provider",
+        "ok" if trellis_provider_ok else "missing",
+        "TRELLIS provider wrapper is configured" if trellis_provider_ok else "TRELLIS provider wrapper is not ready",
+        required=False,
+        details={
+            "wrapper": str(TRELLIS_PROVIDER_WRAPPER),
+            "requirements": str(TRELLIS_REQUIREMENTS),
+            "minimum_vram_gb": TRELLIS_SOURCE["minimum_vram_gb"],
+            "output_formats": ["glb", "json"],
+            "command": "bash utils/run-trellis.sh",
+            "version_probe": "--version",
+            "automatic_downloads_allowed": False,
+        },
+    ))
+    if not trellis_provider_ok:
+        add_action(ctx, Action(
+            "manual.install.trellis.provider",
+            "Configure user-managed TRELLIS for experimental local proxy reconstruction.",
+            False,
+            details={
+                **TRELLIS_SOURCE,
+                "requirements": str(TRELLIS_REQUIREMENTS),
+                "wrapper": str(TRELLIS_PROVIDER_WRAPPER),
+                "trellis_root": str(ctx.trellis_root) if ctx.trellis_root else "",
+                "trellis_model_path": str(ctx.trellis_model_path) if ctx.trellis_model_path else "",
+                "trellis_python": ctx.trellis_python,
+                "commands": trellis_manual_commands(ctx),
+                "configuration_keys": [
+                    "BUILD_ME_GODOT_TRELLIS_ROOT",
+                    "BUILD_ME_GODOT_TRELLIS_MODEL_PATH",
+                    "BUILD_ME_GODOT_TRELLIS_PYTHON",
+                    "BUILD_ME_GODOT_RECONSTRUCTION_COMMAND",
+                ],
+                "license_boundary": "Manual only: no repository clone, Python package install, or model download is performed by this setup action.",
+            },
+        ))
+
     ollama = command_path("ollama")
     ollama_ok, ollama_status = http_json(ctx.ollama_host.rstrip("/") + "/api/tags")
     add_check(ctx, Check("ollama.server", "ok" if ollama_ok else "skip", f"Ollama server at {ctx.ollama_host}", required=False, details={"response": "reachable" if ollama_ok else ollama_status}))
@@ -992,6 +1109,9 @@ def write_config(ctx: Context) -> Path:
         f"BUILD_ME_GODOT_OLLAMA_MODELS_DIR={shell_value(str(ctx.ollama_models_dir))}",
         f"BUILD_ME_GODOT_OLLAMA_MODELS={shell_value(models)}",
         f"BUILD_ME_GODOT_EXAMPLE_PROJECT={shell_value(str(ctx.example_project))}",
+        f"BUILD_ME_GODOT_TRELLIS_ROOT={shell_value(str(ctx.trellis_root or ''))}",
+        f"BUILD_ME_GODOT_TRELLIS_MODEL_PATH={shell_value(str(ctx.trellis_model_path or ''))}",
+        f"BUILD_ME_GODOT_TRELLIS_PYTHON={shell_value(ctx.trellis_python)}",
         "",
         "# ComfyUI model placement guide:",
         "# text encoders: $BUILD_ME_GODOT_COMFYUI_ROOT/models/text_encoders/",
@@ -1026,6 +1146,9 @@ def write_container_config(ctx: Context) -> Path:
         f"BUILD_ME_GODOT_CONTAINER_MODEL_ROOTS={shell_value(' '.join(str(path) for path in model_roots))}",
         f"BUILD_ME_GODOT_CONTAINER_COMFYUI_URL={shell_value(ctx.comfyui_url)}",
         f"BUILD_ME_GODOT_CONTAINER_GPU_ARGS={shell_value('--device nvidia.com/gpu=all --security-opt=label=disable' if nvidia_smi else '')}",
+        f"BUILD_ME_GODOT_TRELLIS_ROOT={shell_value(str(ctx.trellis_root or ''))}",
+        f"BUILD_ME_GODOT_TRELLIS_MODEL_PATH={shell_value(str(ctx.trellis_model_path or ''))}",
+        f"BUILD_ME_GODOT_TRELLIS_PYTHON={shell_value(ctx.trellis_python)}",
         "",
         "# Suggested mounts:",
         "# project: read/write, so generated manifests and handoff reports remain in this checkout",
@@ -1118,6 +1241,19 @@ def action_detail_lines(action: Action) -> list[str]:
         lines.append("Suggested commands:")
         lines.extend(f"- {command}" for command in details.get("commands", []))
         lines.append(str(details.get("restart_note", "")))
+        return lines
+    if action.id == "manual.install.trellis.provider":
+        lines = [
+            "Manual TRELLIS provider setup:",
+            f"source: {details.get('url', '')}",
+            f"model: {details.get('model_url', '')}",
+            f"code license: {details.get('code_license', '')}",
+            f"weight license: {details.get('weight_license', '')}",
+            f"minimum VRAM: {details.get('minimum_vram_gb', '')} GB",
+            str(details.get("license_boundary", "")),
+            "Suggested commands after review:",
+        ]
+        lines.extend(f"- {command}" for command in details.get("commands", []))
         return lines
     if action.id.startswith("container."):
         lines = [action.summary]
@@ -1238,6 +1374,12 @@ def execute_action(ctx: Context, action_id: str) -> None:
         action = next((item for item in ctx.actions if item.id == action_id), None)
         if action is None:
             raise SystemExit("NVIDIA CDI remediation is not currently available.")
+        for line in action_detail_lines(action):
+            emit(line)
+    elif action_id == "manual.install.trellis.provider":
+        action = next((item for item in ctx.actions if item.id == action_id), None)
+        if action is None:
+            raise SystemExit("TRELLIS remediation is not currently available.")
         for line in action_detail_lines(action):
             emit(line)
     elif action_id in {"container.build.local_toolchain", "container.rebuild.local_toolchain"}:
@@ -1596,6 +1738,9 @@ the user has approved the specific action ID shown in the plan output.
     parser.add_argument("--model-download-dir")
     parser.add_argument("--example-project")
     parser.add_argument("--container-config")
+    parser.add_argument("--trellis-root")
+    parser.add_argument("--trellis-model-path")
+    parser.add_argument("--trellis-python")
     parser.add_argument("--ollama-model", action="append")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--yes", action="store_true", help="Apply the selected action without prompting after explicit approval.")

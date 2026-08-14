@@ -59,6 +59,38 @@ Godot does not bundle or copy its code into the MIT addon package. The setup
 app detects an already installed native node but does not download, stage, or
 install the node or its Python requirements.
 
+## TRELLIS
+
+- Publisher: Microsoft Research
+- Project: [TRELLIS](https://github.com/microsoft/TRELLIS)
+- Model: [TRELLIS-image-large](https://huggingface.co/microsoft/TRELLIS-image-large)
+- Version reviewed: main branch and model card reviewed 2026-08-13
+- License reviewed for that version: MIT code and MIT model posture
+- Included with Build Me Godot: No
+- Required by Build Me Godot: No
+
+TRELLIS is acknowledged as an experimental, user-managed local proxy
+reconstruction provider for field-engineer mesh conformance when TripoSR output
+is insufficient. Build Me Godot ships only provider metadata and a wrapper
+contract. It does not clone TRELLIS, install Python packages, download model
+weights, or redistribute TRELLIS submodules.
+
+## Hunyuan3D 2.1
+
+- Publisher: Tencent Hunyuan
+- Project: [Hunyuan3D 2.1](https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1)
+- Version reviewed: `82920d643c0dc2f7bfd7255f45f62d386edfe60c`
+- License reviewed for that version: Tencent Hunyuan 3D 2.1 Community License
+- Included with Build Me Godot: No
+- Required by Build Me Godot: No
+
+Hunyuan3D 2.1 was evaluated locally as an alternate shape-only image-to-3D
+backend for field-engineer proxy reconstruction. It produced stronger raw
+geometry than TripoSR and useful comparison output against TRELLIS, but its
+custom model license is not accepted by Build Me Godot's permissive-default
+dependency policy. Build Me Godot does not install, wrap, redistribute, or
+recommend it as a default provider.
+
 ## Burb Sweeper Humanoid Pipeline
 
 - Copyright: 2026 Inhuman Entertainment

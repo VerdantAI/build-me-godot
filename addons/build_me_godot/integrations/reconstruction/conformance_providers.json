@@ -68,11 +68,19 @@
     },
     {
       "provider_id": "trellis",
-      "role": "candidate_proxy_reconstruction",
-      "status": "candidate_reviewed_not_promoted",
+      "role": "experimental_proxy_reconstruction",
+      "status": "experimental_user_managed_command",
+      "requirements_path": "res://addons/build_me_godot/integrations/reconstruction/trellis/trellis.requirements.json",
       "license_record": "TRELLIS",
       "reviewed_at": "2026-08-13",
-      "review_notes": "MIT repo/model posture, GLB mesh export available, but setup requires Linux, NVIDIA GPU with at least 16GB VRAM, CUDA, and compiled submodules with separate verification.",
+      "commercial_use": true,
+      "input_formats": ["png", "jpg", "jpeg", "webp"],
+      "output_formats": ["glb", "json"],
+      "expected_command_probe": "--version",
+      "expected_command_args": ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"],
+      "vram_class": "medium_high",
+      "review_notes": "MIT repo/model posture, GLB mesh export available, but setup requires Linux, NVIDIA GPU with at least 16GB VRAM, CUDA, and compiled submodules with separate verification. Build Me Godot requires a local checkout and local model folder; no automatic downloads are allowed.",
+      "manual_setup": "Install microsoft/TRELLIS and microsoft/TRELLIS-image-large independently, set BUILD_ME_GODOT_TRELLIS_ROOT and BUILD_ME_GODOT_TRELLIS_MODEL_PATH, then configure reconstruction_command to `bash utils/run-trellis.sh` for evaluation.",
       "automatic_downloads_allowed": false
     },
     {

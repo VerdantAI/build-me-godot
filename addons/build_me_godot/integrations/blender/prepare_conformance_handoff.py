@@ -83,6 +83,20 @@ def material(name, color):
     return mat
 
 
+def shell_material(name, color):
+    mat = material(name, color)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    bsdf = nodes.get("Principled BSDF")
+    if bsdf:
+        bsdf.inputs["Base Color"].default_value = color
+        bsdf.inputs["Alpha"].default_value = color[3]
+        bsdf.inputs["Roughness"].default_value = 0.82
+    mat.blend_method = "BLEND"
+    mat.show_transparent_back = True
+    return mat
+
+
 def apply_material(obj, mat):
     if obj.type != "MESH":
         return
@@ -111,6 +125,16 @@ def is_primary_body_mesh_name(name):
 
 def display_name_for_target_rig(target_rig):
     return "male" if target_rig == "primary" else "female"
+
+
+def tag_shell_guide(obj, guide_id, source_target):
+    obj["guide_id"] = guide_id
+    obj["source_target"] = source_target
+    obj["purpose"] = "Editable field-engineer shell guide"
+    obj["generated_shell_guide"] = True
+    obj["reference_only"] = False
+    obj["export_exclude"] = False
+    obj.hide_select = False
 
 
 def align_object(obj):
@@ -212,6 +236,160 @@ def bounds_3d(objects):
         "max": [round(max(point[index] for point in points), 5) for index in range(3)],
         "size": [round(max(point[index] for point in points) - min(point[index] for point in points), 5) for index in range(3)],
     }
+
+
+def add_cube_guide(collection, name, location, scale, mat, source_target):
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
+    obj = bpy.context.object
+    obj.name = name
+    obj.scale = scale
+    apply_material(obj, mat)
+    tag_shell_guide(obj, name, source_target)
+    move_to(obj, collection)
+    return obj
+
+
+def add_uv_sphere_guide(collection, name, location, scale, mat, source_target, segments=32, rings=12):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, radius=1.0, location=location)
+    obj = bpy.context.object
+    obj.name = name
+    obj.scale = scale
+    apply_material(obj, mat)
+    tag_shell_guide(obj, name, source_target)
+    move_to(obj, collection)
+    return obj
+
+
+def add_cylinder_guide(collection, name, location, radius, depth, mat, source_target, vertices=48):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=location)
+    obj = bpy.context.object
+    obj.name = name
+    apply_material(obj, mat)
+    tag_shell_guide(obj, name, source_target)
+    move_to(obj, collection)
+    return obj
+
+
+def add_field_engineer_shell_guides(plan, work_collection, shell_collection, report):
+    body_bounds = bounds_3d(conformance_surface_objects(work_collection))
+    if not body_bounds:
+        report["warnings"].append("Could not create shell guides: no visible target body mesh bounds.")
+        return []
+    targets = set(plan.get("field_engineer_targets", {}).get("silhouette", []))
+    min_x, min_y, min_z = body_bounds["min"]
+    max_x, max_y, max_z = body_bounds["max"]
+    width = max(max_x - min_x, 0.001)
+    depth = max(max_y - min_y, 0.001)
+    height = max(max_z - min_z, 0.001)
+    center_x = (min_x + max_x) * 0.5
+    center_y = (min_y + max_y) * 0.5
+    guides = []
+    hi_vis = shell_material("field_engineer_hi_vis_yellow", (0.92, 0.95, 0.12, 0.72))
+    reflective = shell_material("field_engineer_reflective_stripe", (0.88, 0.92, 0.82, 0.82))
+    hardhat = shell_material("field_engineer_hardhat_orange", (1.0, 0.54, 0.08, 0.92))
+    dark = shell_material("field_engineer_dark_workwear", (0.05, 0.06, 0.06, 0.88))
+    leather = shell_material("field_engineer_tool_leather", (0.33, 0.16, 0.06, 0.9))
+
+    if "helmet" in targets:
+        head_z = min_z + height * 0.93
+        guides.append(add_uv_sphere_guide(
+            shell_collection,
+            "hardhat_crown_shell",
+            (center_x, center_y, head_z),
+            (width * 0.17, depth * 1.65, height * 0.045),
+            hardhat,
+            "helmet",
+        ))
+        brim = add_cylinder_guide(
+            shell_collection,
+            "hardhat_brim_shell",
+            (center_x, center_y - depth * 0.12, head_z - height * 0.025),
+            width * 0.2,
+            height * 0.018,
+            hardhat,
+            "helmet",
+        )
+        brim.scale.y = 0.55
+        guides.append(brim)
+
+    if "vest" in targets:
+        torso_z = min_z + height * 0.53
+        vest_height = height * 0.34
+        vest_width = width * 0.56
+        vest_depth = depth * 0.58
+        guides.append(add_cube_guide(
+            shell_collection,
+            "hi_vis_vest_torso_shell",
+            (center_x, center_y - depth * 0.02, torso_z),
+            (vest_width, vest_depth, vest_height),
+            hi_vis,
+            "vest",
+        ))
+        guides.append(add_cube_guide(
+            shell_collection,
+            "vest_reflective_vertical_l",
+            (center_x - vest_width * 0.32, center_y - vest_depth * 0.54, torso_z),
+            (width * 0.025, depth * 0.035, vest_height * 1.02),
+            reflective,
+            "vest",
+        ))
+        guides.append(add_cube_guide(
+            shell_collection,
+            "vest_reflective_vertical_r",
+            (center_x + vest_width * 0.32, center_y - vest_depth * 0.54, torso_z),
+            (width * 0.025, depth * 0.035, vest_height * 1.02),
+            reflective,
+            "vest",
+        ))
+        guides.append(add_cube_guide(
+            shell_collection,
+            "vest_reflective_belt_stripe",
+            (center_x, center_y - vest_depth * 0.55, torso_z - vest_height * 0.16),
+            (vest_width * 0.85, depth * 0.035, height * 0.018),
+            reflective,
+            "vest",
+        ))
+
+    if "tool_belt" in targets:
+        belt_z = min_z + height * 0.43
+        guides.append(add_cube_guide(
+            shell_collection,
+            "utility_belt_shell",
+            (center_x, center_y, belt_z),
+            (width * 0.45, depth * 0.75, height * 0.026),
+            leather,
+            "tool_belt",
+        ))
+        guides.append(add_cube_guide(
+            shell_collection,
+            "tool_pouch_shell",
+            (center_x + width * 0.27, center_y - depth * 0.52, belt_z - height * 0.055),
+            (width * 0.06, depth * 0.12, height * 0.095),
+            leather,
+            "tool_belt",
+        ))
+
+    if "boots" in targets:
+        boot_z = min_z + height * 0.04
+        foot_y = center_y - depth * 0.2
+        for side, x_sign in [("l", -1.0), ("r", 1.0)]:
+            guides.append(add_cube_guide(
+                shell_collection,
+                f"work_boot_{side}_shell",
+                (center_x + x_sign * width * 0.11, foot_y, boot_z),
+                (width * 0.08, depth * 0.28, height * 0.055),
+                dark,
+                "boots",
+            ))
+
+    report["shell_guides"] = {
+        "collection": shell_collection.name,
+        "objects": [obj.name for obj in guides],
+        "target_bounds": body_bounds,
+        "editable": True,
+        "reference_only": False,
+    }
+    return guides
 
 
 def conformance_surface_objects(collection):
@@ -480,7 +658,7 @@ def clothing_shell_candidates(plan):
     return candidates
 
 
-def build_conformance_guidance(plan, report, source_collection, proxy_collection, aligned_proxy_collection, work_collection):
+def build_conformance_guidance(plan, report, source_collection, proxy_collection, aligned_proxy_collection, work_collection, shell_collection):
     source_bounds = bounds_3d(conformance_surface_objects(source_collection))
     proxy_bounds = bounds_3d(list(proxy_collection.objects))
     aligned_proxy_bounds = bounds_3d(list(aligned_proxy_collection.objects))
@@ -503,6 +681,7 @@ def build_conformance_guidance(plan, report, source_collection, proxy_collection
             "proxy": proxy_bounds,
             "aligned_proxy": aligned_proxy_bounds,
             "work": work_bounds,
+            "shell_guides": bounds_3d(list(shell_collection.objects)),
         },
         "silhouette_overlays": report.get("silhouette_overlays", {}),
         "body_region_scale_hints": {
@@ -521,7 +700,11 @@ def build_conformance_guidance(plan, report, source_collection, proxy_collection
             "AI_PROXY_MESH_REFERENCES",
             "AI_PROXY_ALIGNED_REVIEW_REFERENCES",
         ],
-        "editable_collections": ["GENERATED_CONFORMANCE_WORK_MESHES"],
+        "editable_collections": [
+            "GENERATED_CONFORMANCE_WORK_MESHES",
+            "GENERATED_FIELD_ENGINEER_SHELL_GUIDES",
+        ],
+        "shell_guides": report.get("shell_guides", {}),
         "warnings": warnings,
         "blockers": [],
         "changed_paths": [],
@@ -562,6 +745,7 @@ def main():
     proxy_meshes = make_collection("AI_PROXY_MESH_REFERENCES", root)
     aligned_proxy_meshes = make_collection("AI_PROXY_ALIGNED_REVIEW_REFERENCES", root)
     work_meshes = make_collection("GENERATED_CONFORMANCE_WORK_MESHES", root)
+    shell_guides = make_collection("GENERATED_FIELD_ENGINEER_SHELL_GUIDES", root)
 
     report = {
         "schema_version": 1,
@@ -581,6 +765,7 @@ def main():
             "proxy_meshes": proxy_meshes.name,
             "aligned_proxy_meshes": aligned_proxy_meshes.name,
             "work_meshes": work_meshes.name,
+            "shell_guides": shell_guides.name,
         },
         "validation_constraints": plan.get("validation_constraints", {}),
         "warnings": [],
@@ -606,14 +791,17 @@ def main():
     for path in provider_proxy_outputs(plan):
         import_meshes(path, proxy_meshes, "AI reconstruction proxy reference", report, False, None)
     duplicate_aligned_proxy(source_meshes, proxy_meshes, aligned_proxy_meshes, report)
+    add_field_engineer_shell_guides(plan, work_meshes, shell_guides, report)
     add_scene_label("raw AI proxy: immutable, not production topology", (0.0, -0.9, 2.35), proxy_meshes)
     add_scene_label("aligned proxy review duplicate", (0.0, 0.9, 2.35), aligned_proxy_meshes)
     add_scene_label("editable source work meshes", (0.0, 0.0, 2.65), work_meshes)
+    add_scene_label("editable field engineer shell guides", (0.0, 0.0, 2.85), shell_guides)
     report["bounds"] = {
         "source": bounds_3d(conformance_surface_objects(source_meshes)),
         "proxy": bounds_3d(list(proxy_meshes.objects)),
         "aligned_proxy": bounds_3d(list(aligned_proxy_meshes.objects)),
         "work": bounds_3d(conformance_surface_objects(work_meshes)),
+        "shell_guides": bounds_3d(list(shell_guides.objects)),
     }
 
     output_dir = output_dir / options.target_rig
@@ -632,7 +820,7 @@ def main():
         "reference_views": {view: VIEW_LAYOUT[view]["location"] for view in VIEW_LAYOUT},
     }
     write_silhouette_overlays(output_dir, report, source_meshes, proxy_meshes, aligned_proxy_meshes, work_meshes)
-    guidance = build_conformance_guidance(plan, report, source_meshes, proxy_meshes, aligned_proxy_meshes, work_meshes)
+    guidance = build_conformance_guidance(plan, report, source_meshes, proxy_meshes, aligned_proxy_meshes, work_meshes, shell_guides)
     guidance["changed_paths"].append(report["guidance"])
     guidance_path.write_text(json.dumps(guidance, indent=2) + "\n")
     report["changed_paths"].extend([report["blend"], report["report"], report["guidance"]])

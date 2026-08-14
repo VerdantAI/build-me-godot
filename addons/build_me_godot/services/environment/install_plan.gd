@@ -72,6 +72,38 @@ static func _action(id: String, options: Dictionary) -> Dictionary:
 				"verification_checks": ["conformance.provider.triposr"],
 				"applied": false
 			}
+		"install.manual.trellis.provider":
+			return {
+				"id": id, "mode": "manual",
+				"summary": "Configure a user-managed TRELLIS proxy generation command.",
+				"rationale": "TRELLIS is an experimental local proxy provider for cases where TripoSR quality is insufficient. Build Me Godot requires a user-owned checkout, user-owned local model folder, and separate Python environment; it does not clone repositories, install packages, or download weights.",
+				"source": "https://github.com/microsoft/TRELLIS",
+				"target": "BUILD_ME_GODOT_TRELLIS_ROOT, BUILD_ME_GODOT_TRELLIS_MODEL_PATH, and BUILD_ME_GODOT_RECONSTRUCTION_COMMAND",
+				"command_contract": {
+					"version_probe": "--version",
+					"arguments": ["--input", "<image>", "--output", "<mesh.glb>", "--metadata-output", "<metadata.json>"],
+					"automatic_downloads_allowed": false
+				},
+				"paths": [
+					"res://addons/build_me_godot/integrations/reconstruction/trellis/trellis.requirements.json",
+					"res://addons/build_me_godot/integrations/reconstruction/conformance_providers.json"
+				],
+				"prerequisites": [
+					"User-installed microsoft/TRELLIS checkout",
+					"User-installed TRELLIS Python environment with CUDA-compatible dependencies",
+					"Local microsoft/TRELLIS-image-large model folder",
+					"Linux NVIDIA GPU with at least 16 GB VRAM"
+				],
+				"reversible": true,
+				"license": {
+					"code": "MIT",
+					"weights": "MIT",
+					"commercial_use": true,
+					"notice": "Submodule and dependency licenses must be reviewed separately before redistribution."
+				},
+				"verification_checks": ["conformance.provider.trellis"],
+				"applied": false
+			}
 		"write.container.config":
 			return {
 				"id": id, "mode": "manual",

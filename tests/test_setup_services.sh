@@ -87,11 +87,22 @@ run_setup_without_ctk() {
 plan=$(run_setup plan --json || true)
 provider_version=$(bash "$project_root/utils/run-container-triposr.sh" --version)
 [[ "$provider_version" == "build-me-godot-container-triposr-provider 1" ]]
+set +e
+trellis_unconfigured_version=$(bash "$project_root/utils/run-trellis.sh" --version 2>&1)
+trellis_unconfigured_code=$?
+set -e
+[[ "$trellis_unconfigured_code" -eq 1 ]]
+grep -q 'build-me-godot-trellis-provider 1' <<<"$trellis_unconfigured_version"
+grep -q 'not configured' <<<"$trellis_unconfigured_version"
 jq -e '.checks[] | select(.id == "comfyui.helper") | .summary | contains("installed on disk")' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "comfyui.nodes") | .summary | contains("not yet verified")' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "comfyui.models") | .summary | test("installed: [0-9]+/[0-9]+")' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "triposr.models" and .status == "missing" and .required == false) | .details.missing | length == 2' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "comfyui.flowty_triposr.node" and .status == "missing" and .required == false) | .details.license == "GPL-3.0" and .details.python_requirements_manual == true' <<<"$plan" >/dev/null
+jq -e '.checks[] | select(.id == "trellis.root" and .status == "missing" and .required == false) | .details.automatic_install_allowed == false' <<<"$plan" >/dev/null
+jq -e '.checks[] | select(.id == "trellis.model" and .status == "missing" and .required == false) | .details.automatic_downloads_allowed == false' <<<"$plan" >/dev/null
+jq -e '.checks[] | select(.id == "trellis.provider" and .status == "missing" and .required == false) | .details.command == "bash utils/run-trellis.sh"' <<<"$plan" >/dev/null
+jq -e '.actions[] | select(.id == "manual.install.trellis.provider" and .ready == true and .mutates == false) | .details.code_license == "MIT" and .details.weight_license == "MIT" and (.details.commands | any(contains("BUILD_ME_GODOT_TRELLIS_ROOT")))' <<<"$plan" >/dev/null
 jq -e '.actions | all(.id != "download.triposr.models" and .id != "install.triposr.checkpoint.comfyui" and .id != "download.flowty.triposr.node" and .id != "install.flowty.triposr.node")' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "container.runtime" and .status == "ok") | .details.detected.podman | length > 0' <<<"$plan" >/dev/null
 jq -e '.checks[] | select(.id == "container.gpu.nvidia_cdi" and .status == "warning") | .details.expected_cdi_specs == ["'"$test_root"'/missing-cdi/nvidia.yaml"]' <<<"$plan" >/dev/null
@@ -123,6 +134,16 @@ grep -q 'apply manual.configure.nvidia.cdi --non-interactive' <<<"$ready_setup_o
 missing_ctk_output=$(run_setup_without_ctk --non-interactive || true)
 grep -q 'nvidia-ctk missing' <<<"$missing_ctk_output"
 grep -q 'sudo dnf install -y nvidia-container-toolkit' <<<"$missing_ctk_output"
+
+mkdir -p "$test_root/TRELLIS/trellis/pipelines" "$test_root/TRELLIS-model"
+printf '#!/usr/bin/env bash\n' > "$test_root/TRELLIS/setup.sh"
+printf '{}\n' > "$test_root/TRELLIS-model/config.json"
+configured_trellis_version=$(BUILD_ME_GODOT_TRELLIS_ROOT="$test_root/TRELLIS" BUILD_ME_GODOT_TRELLIS_MODEL_PATH="$test_root/TRELLIS-model" \
+    bash "$project_root/utils/run-trellis.sh" --version)
+[[ "$configured_trellis_version" == "build-me-godot-trellis-provider 1" ]]
+configured_trellis_plan=$(BUILD_ME_GODOT_TRELLIS_ROOT="$test_root/TRELLIS" BUILD_ME_GODOT_TRELLIS_MODEL_PATH="$test_root/TRELLIS-model" \
+    run_setup plan --json || true)
+jq -e '.checks[] | select(.id == "trellis.provider" and .status == "ok")' <<<"$configured_trellis_plan" >/dev/null
 
 for name in comfyui ollama blender; do
     jq -e --arg id "start.$name" '.actions[] | select(.id == $id and .ready == true)' <<<"$plan" >/dev/null
