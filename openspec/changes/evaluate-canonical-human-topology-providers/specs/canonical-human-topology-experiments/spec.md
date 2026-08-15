@@ -59,6 +59,7 @@ The system SHALL define provider-agnostic contracts for canonical-human inputs,
 provider readiness, outputs, validation reports, and scorecards. Contracts SHALL
 support morph parameters, neutral meshes, texture maps, residual maps, face
 references, Gaussian or NeRF appearance references, and immutable-source flags.
+Contracts SHALL also include a declared game assumption for each experiment.
 
 #### Scenario: MPFB and SHERT outputs use one comparison shape
 
@@ -78,6 +79,76 @@ references, Gaussian or NeRF appearance references, and immutable-source flags.
   appearance data
 - **AND** `production_topology_candidate` is false unless a separate reviewed
   mesh-conversion path exists.
+
+### Requirement: Experiments Declare A Game Assumption
+
+The system SHALL require every canonical-human research plan, provider
+benchmark, and scorecard to declare a game assumption before evaluating pipeline
+fitness. A game assumption SHALL define camera/readability constraints,
+expected simultaneous character volume, named-character versus variant/crowd
+ratio, platform or runtime pressure, asset-budget class, LOD strategy, and
+minimum evidence needed for acceptance.
+
+#### Scenario: Isometric party benchmark values silhouettes and equipment
+
+- **GIVEN** a provider benchmark declares the `3d_isometric_party` assumption
+- **WHEN** the scorecard is generated
+- **THEN** the scorecard includes medium-camera readability, modular equipment
+  support, portrait or dialogue close-up exceptions, LOD expectations, and
+  animation-retargeting evidence
+- **AND** providers are compared on party-RPG character quality rather than
+  settlement-scale crowd throughput.
+
+#### Scenario: Isometric settlement benchmark values volume
+
+- **GIVEN** a provider benchmark declares the `3d_isometric_settlement`
+  assumption
+- **WHEN** the scorecard is generated
+- **THEN** the scorecard includes expected simultaneous character count,
+  atlas/material reuse expectations, LOD or impostor strategy, and far-camera
+  readability evidence
+- **AND** high-detail close-up geometry does not increase production fitness
+  unless it can be reduced to the declared crowd budget.
+
+#### Scenario: First-person VR benchmark values close inspection
+
+- **GIVEN** a provider benchmark declares the `first_person_vr` assumption
+- **WHEN** validation runs
+- **THEN** the validation report includes close-camera material scale,
+  hand/finger deformation, interaction anchors, collision proxies, and
+  conservative LOD-transition checks
+- **AND** outputs that only pass far-camera readability remain review
+  references, not production-ready VR characters.
+
+#### Scenario: First-person FPS benchmark separates body and arms
+
+- **GIVEN** a provider benchmark declares the `first_person_fps` assumption
+- **WHEN** the scorecard is generated
+- **THEN** the scorecard includes world-character readiness, optional
+  first-person arm readiness, weapon and equipment socket evidence,
+  combat-distance silhouette evidence, and animation stress-pose validation
+- **AND** providers that cannot preserve stable sockets or animation contracts
+  remain reference-only for FPS production work.
+
+#### Scenario: Low-poly benchmark values simplification
+
+- **GIVEN** a provider benchmark declares the `low_poly_high_volume`
+  assumption
+- **WHEN** the scorecard is generated
+- **THEN** the scorecard rewards small mesh budgets, palette/material swaps,
+  deterministic variants, batching, and tiny-thumbnail readability
+- **AND** dense reconstruction detail is treated as concept evidence unless a
+  simplified canonical output is produced.
+
+#### Scenario: New game mode is introduced
+
+- **GIVEN** a researcher wants to evaluate a side-scroller, over-the-shoulder
+  third-person game, tactical grid, MMO crowd, mobile game, or another mode
+- **WHEN** the research plan is created
+- **THEN** it defines a new game assumption with the same required budget,
+  camera, volume, readability, and evidence fields
+- **AND** provider comparisons are scoped to that assumption rather than mixed
+  with unrelated game modes.
 
 ### Requirement: MPFB-First Prototype Preserves Humanoid Contracts
 

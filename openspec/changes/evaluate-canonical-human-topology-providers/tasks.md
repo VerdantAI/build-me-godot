@@ -15,46 +15,64 @@
   `canonical_human_inputs.json`, `canonical_human_outputs.json`,
   `canonical_human_validation.json`, and
   `canonical_human_scorecard.json` contracts.
-- [ ] 2.2 Add fixture examples under project-local test data, not under the
+- [ ] 2.2 Add game-assumption contract fields for camera mode, expected
+  simultaneous character count, asset budgets, LOD strategy, and readability
+  evidence.
+- [ ] 2.3 Add fixture examples under project-local test data, not under the
   addon package output directories.
-- [ ] 2.3 Add parser/contract validation tests for accepted, research-only,
+- [ ] 2.4 Add parser/contract validation tests for accepted, research-only,
   blocked, and unknown license states.
 
-## 3. MPFB-First Prototype
+## 3. Game-Mode Pipeline Research
 
-- [ ] 3.1 Add read-only readiness checks for Blender 4.2+ and a user-configured
+- [ ] 3.1 Define baseline assumptions for `3d_isometric_party`,
+  `3d_isometric_settlement`, `first_person_vr`, `first_person_fps`, and
+  `low_poly_high_volume`.
+- [ ] 3.2 Add a pipeline scorecard template that compares provider fitness
+  under one declared game assumption at a time.
+- [ ] 3.3 Add example research briefs for at least one provider under each
+  baseline game assumption.
+- [ ] 3.4 Require future provider benchmark tasks to declare either one of the
+  baseline assumptions or a new explicitly documented assumption.
+
+## 4. MPFB-First Prototype
+
+- [ ] 4.1 Add read-only readiness checks for Blender 4.2+ and a user-configured
   MPFB installation.
-- [ ] 3.2 Add an explicit local wrapper contract that invokes only a configured
+- [ ] 4.2 Add an explicit local wrapper contract that invokes only a configured
   command or Blender script and writes results under
   `res://build_me_godot/characters/<character_id>/canonical_human/<version>/`.
-- [ ] 3.3 Add fixture-driven morph-vector and texture-map handoff before any AI
+- [ ] 4.3 Add fixture-driven morph-vector and texture-map handoff before any AI
   estimator is integrated.
-- [ ] 3.4 Validate exported character scale, `neutral_a_pose_30deg_v1`,
+- [ ] 4.4 Validate exported character scale, `neutral_a_pose_30deg_v1`,
   humanoid bone/socket names, and `SkeletonProfileHumanoid` compatibility.
 
-## 4. Research Provider Benchmarks
+## 5. Research Provider Benchmarks
 
-- [ ] 4.1 Add disabled-by-default scorecard fixtures for SHERT,
+- [ ] 5.1 Add disabled-by-default scorecard fixtures for SHERT,
   HumanGaussian, HAHA, UVFaceFusion, and TECA.
-- [ ] 4.2 Add research-only readiness checks that require explicit local paths,
+- [ ] 5.2 Add research-only readiness checks that require explicit local paths,
   offline/no-download mode, and license acknowledgement before provider runs.
-- [ ] 4.3 Add benchmark report templates for setup friction, output
+- [ ] 5.3 Add benchmark report templates for setup friction, output
   representation, animation control, texture usefulness, and Godot import
-  distance.
+  distance under a declared game assumption.
 
-## 5. Documentation
+## 6. Documentation
 
-- [ ] 5.1 Document the MPFB-first architecture and why arbitrary AI topology
+- [ ] 6.1 Document the MPFB-first architecture and why arbitrary AI topology
   remains reference-only.
-- [ ] 5.2 Document SMPL-X licensing as a research/commercial gate, including
+- [ ] 6.2 Document SMPL-X licensing as a research/commercial gate, including
   why SMPL-X-backed systems are not default providers.
-- [ ] 5.3 Document that Gaussian/NeRF layers are appearance references unless
+- [ ] 6.3 Document that Gaussian/NeRF layers are appearance references unless
   a future Godot runtime/import path is explicitly designed.
+- [ ] 6.4 Document the baseline game assumptions and how to add new assumptions
+  for side-scrollers, over-the-shoulder third-person games, tactical grids,
+  MMO crowds, mobile games, or non-human character sets.
 
-## 6. Validation
+## 7. Validation
 
-- [ ] 6.1 Run the headless editor load.
-- [ ] 6.2 Run GDScript tests.
-- [ ] 6.3 Run Python parser checks.
-- [ ] 6.4 Run `openspec validate evaluate-canonical-human-topology-providers --strict`.
-- [ ] 6.5 Run `git diff --check`.
+- [ ] 7.1 Run the headless editor load.
+- [ ] 7.2 Run GDScript tests.
+- [ ] 7.3 Run Python parser checks.
+- [ ] 7.4 Run `openspec validate evaluate-canonical-human-topology-providers --strict`.
+- [ ] 7.5 Run `git diff --check`.

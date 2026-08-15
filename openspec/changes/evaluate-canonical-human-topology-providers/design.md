@@ -141,6 +141,8 @@ Architectural relevance:
   version/commit when tested, code license, model/data license, commercial-use
   posture, install mode, and output contract.
 - Store all manifests, experiments, and outputs under `res://build_me_godot/`.
+- Require every research task to name a game assumption before comparing
+  providers or proposing pipeline work.
 
 **Non-goals**
 
@@ -151,6 +153,123 @@ Architectural relevance:
   are validated.
 - Treating research output as production topology without manual approval.
 - Adding a second retargeting system beside Godot `SkeletonProfileHumanoid`.
+
+## Game Assumption Tracks
+
+Provider research must be scoped to a game-mode assumption. A character
+pipeline that works for a close first-person VR companion may be wasteful for a
+3D isometric settlement sim, and a low-poly crowd pipeline may fail the visual
+inspection needs of a first-person FPS. Each experiment should therefore
+declare one of the known assumptions below or define a new assumption with the
+same fields.
+
+| Assumption | Reference feel | Camera/readability | Typical character volume | Primary asset pressure | Pipeline bias |
+| --- | --- | --- | --- | --- | --- |
+| `3d_isometric_party` | Baldur's Gate style party RPG | Medium-distance angled camera; silhouettes, armor layers, weapons, and portraits matter more than pore detail | Dozens of named characters plus variants | LODs, equipment interchange, readable materials, portrait/close-up exceptions | canonical body with modular clothes, medium texture budgets, strong silhouette validation |
+| `3d_isometric_settlement` | Farthest Frontier style settlement sim | Farther angled camera; occupation, team color, tool, and animation readability dominate | Hundreds of villagers/workers on screen over time | draw calls, atlas reuse, animation sharing, automatic LOD/impostors | shared topology, aggressive variants, atlas/material batching, low-cost rigs |
+| `first_person_vr` | Half-Life: Alyx style VR | Very close inspection, stereo depth, hands/controllers, embodied scale, and interaction zones matter | Few high-detail humans or hands near the player | deformation quality, hand detail, material scale, collision and interaction anchors | high-fidelity canonical mesh, hand/face checks, close-up texture validation, conservative LOD swaps |
+| `first_person_fps` | mainstream first-person shooter | Close NPC/enemy readability at variable distance; first-person arms may be separate assets | Tens of active characters, often with repeated factions | animation reliability, damage/readability zones, attachments, first-person arms/weapons | split body/arms contracts, faction variants, medium-high textures, strict skeleton sockets |
+| `low_poly_high_volume` | Stardew Valley or Factorio production constraints adapted to 3D/2.5D | stylized shape language; identity comes from color blocks, accessories, and animation rather than detail | Many repeated characters, units, or workers | tiny meshes/textures, batching, deterministic variation, authored readability | generated concepts -> simplified canonical assets, palette/material swaps, sprite/impostor options |
+
+Additional assumptions may be added for side-scrollers, over-the-shoulder
+third-person games, cinematic dialogue RPGs, tactical grids, MMO crowds,
+mobile games, or non-human character sets. New assumptions must define:
+
+- camera distance and angle;
+- maximum expected simultaneous characters;
+- named-character versus variant/crowd ratio;
+- target platform class;
+- mesh, material, texture, animation, and collision budget expectations;
+- minimum acceptable close-up and far-readability evidence;
+- whether outputs are production candidates, immutable references, or both.
+
+## Pipeline Families By Assumption
+
+### 3D Isometric Party RPG
+
+This track should test whether canonical morph providers can produce
+medium-detail humanoids with modular equipment and strong silhouette cues.
+The pipeline should emphasize:
+
+- base body consistency for animation retargeting;
+- interchangeable armor, clothing, hair, weapons, and props;
+- material/texture variants that remain readable from the game camera;
+- optional portrait or dialogue close-up assets as a higher-detail exception;
+- LOD and impostor generation for non-party background actors.
+
+MPFB-first experiments are likely strongest here because a Blender-native
+human generator can produce controlled variants and attach authored equipment.
+SHERT-like output may be useful as visual reference for clothing folds and
+textures, but should not become production topology automatically.
+
+### 3D Isometric Settlement Sim
+
+This track should assume high character counts and frequent repetition. The
+pipeline should optimize for recognizable job silhouettes, shared animation
+sets, and atlas/material reuse rather than unique high-fidelity characters.
+The pipeline should emphasize:
+
+- a small set of canonical bodies and outfit shells;
+- deterministic variation across color, height, headwear, tools, and bags;
+- texture atlas packing and material batching;
+- low-bone or shared-skeleton rigs;
+- far-camera validation thumbnails and crowd-performance reports.
+
+HumanGaussian, HAHA, and dense reconstruction providers should usually be
+reference-only in this track because their detail and runtime assumptions do
+not match the crowd problem. They may still help create concept renders for
+job archetypes.
+
+### First-Person VR
+
+This track should assume close inspection, stereo rendering, embodied scale,
+and hand interaction. The pipeline should emphasize:
+
+- hand/finger topology, weights, and controller/physics interaction anchors;
+- face, eye, mouth, and material scale checks for close viewing;
+- deformation validation across reaches, grabs, crouches, and near-camera
+  poses;
+- collision proxies and socket placement for interactable accessories;
+- conservative LOD transitions to avoid stereo discomfort.
+
+SMPL-X-backed research may be informative for hands and face detail, but its
+license and runtime boundaries still apply. MPFB-like production prototypes
+must prove close-up hand and material quality before this track is considered
+viable.
+
+### First-Person FPS
+
+This track should separate world characters from first-person arms and weapons
+when needed. The pipeline should emphasize:
+
+- stable sockets for weapons, magazines, holsters, armor, backpacks, and hit
+  feedback zones;
+- deformation quality under sprint, aim, crouch, ragdoll, and cover poses;
+- faction/team variant generation using shared topology and materials;
+- clear enemy/friendly silhouettes at combat distances;
+- optional high-detail first-person arms that may use a different mesh budget
+  while preserving naming and animation contracts.
+
+Canonical topology remains valuable here because animation reliability matters
+more than raw reconstruction detail. Gaussian/NeRF detail should remain
+reference material unless a conventional mesh/material extraction path is
+reviewed.
+
+### Low-Poly High-Volume
+
+This track should treat AI output as concept and variation guidance for simple
+assets, not as a source of final dense geometry. The pipeline should emphasize:
+
+- palette, silhouette, and accessory readability;
+- very small mesh and texture budgets;
+- deterministic variant generation from a few authored bases;
+- sprite, billboard, impostor, or ultra-low LOD outputs when appropriate;
+- validation based on tiny on-screen thumbnails and batch performance.
+
+For this track, the most promising pipeline may be "AI generates design
+intent, Blender/Godot emits simplified canonical variants" rather than any
+research reconstruction provider. Provider scorecards should reward simplicity,
+batchability, and style consistency.
 
 ## Provider Classes
 
@@ -359,6 +478,19 @@ Each provider experiment should produce a scorecard with:
 - `output_representation`: `mesh`, `mesh_with_maps`, `gaussian`,
   `mesh_plus_gaussian`, `nerf_hybrid`, or `unknown`;
 - `production_topology_candidate`: boolean;
+- `game_assumption_id`;
+- `camera_distance_class`: `far`, `medium`, `close`, `vr_close`, or
+  `mixed`;
+- `expected_simultaneous_characters`;
+- `named_character_ratio`;
+- `mesh_budget_class`: `tiny`, `low`, `medium`, `high`, or `hero`;
+- `texture_budget_class`: `atlas_tiny`, `low`, `medium`, `high`, or `hero`;
+- `rig_budget_class`: `sprite_or_impostor`, `low_bone`, `humanoid_shared`,
+  `humanoid_full`, or `hero_closeup`;
+- `lod_strategy`: `none`, `manual_lod`, `generated_lod`, `impostor`,
+  `sprite_sheet`, or `mixed`;
+- `readability_evidence_paths`: project-local thumbnails or render reports for
+  the declared camera assumption;
 - `manual_review_required`: array of reasons;
 - `evidence_paths`: project-local reports and thumbnails.
 

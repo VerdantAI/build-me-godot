@@ -23,6 +23,9 @@ commercial-license path or a replacement permissive template.
   integration.
 - Define a provider comparison scorecard for MPFB2/MakeHuman, SHERT,
   HumanGaussian, HAHA, UVFaceFusion, and TECA.
+- Require every research task and provider benchmark to declare a target game
+  assumption such as 3D isometric, first-person VR, first-person FPS,
+  low-poly/high-volume, or another explicit mode.
 - Require reference manifests, output contracts, license records, and
   no-download readiness checks before any provider wrapper is considered.
 - Preserve the existing local-only, explicit-action, addon-self-contained
