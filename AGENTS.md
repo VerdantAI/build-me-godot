@@ -2,6 +2,10 @@
 
 Read `README.md`, `addons/build_me_godot/ATTRIBUTIONS.md`, and `addons/build_me_godot/LICENSES.md` before changing integrations or dependencies.
 
+- The project goal is infrastructure for building Godot characters and assets that are play-test ready, not training new models or recreating existing DCC, CAD, rigging, reconstruction, or generation tools.
+- Prefer reusing open-source, permissively licensed, local-capable tools before writing custom implementation code. Search for existing tools, adapters, and standards first; do not rush into bespoke code unless the gap is real, scoped, and license-compatible.
+- Leverage common game-development tools such as Blender, ComfyUI, asset stores, and other established DCC/generation ecosystems. Godot is the framework and source of workflow truth, but the pipeline should wire capable external tools together rather than force all work into Godot.
+- Prefer a proven orchestrator such as ComfyUI, Hugging Face tooling, or another reviewed local-capable workflow system when it can coordinate a stage cleanly; add Build Me Godot orchestration only where existing orchestrators leave a clear integration gap.
 - Keep the Asset Store package self-contained beneath `addons/build_me_godot/`.
 - Store artist-created manifests and outputs beneath `res://build_me_godot/`, never inside the addon directory.
 - Do not install ComfyUI, model weights, Python packages, Blender extensions, Gator Model Studio, or animation assets automatically.
