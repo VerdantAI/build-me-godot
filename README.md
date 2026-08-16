@@ -62,7 +62,14 @@ The intended loop is:
 4. Queue a local ComfyUI reference workflow from the dock.
 5. Review the generated version, iterate prompts into `v1`, `v2`, and later runs, then approve one version.
 6. Explicitly continue the downstream pipeline. This writes `blender/<version>/reference_inputs.json` for Blender automation and advances the manifest stage.
-7. Register the final Godot scene, animations, and secondary assets back into the same character manifest when downstream work completes.
+7. Create and approve a post-concept character recipe when the concept art is
+   accepted. The recipe records body source, provider provenance, equipment
+   plan, sockets, material palette, animation expectations, LOD strategy, and
+   validation gates.
+8. Run explicit Blender assembly from the approved recipe when ready. This
+   creates project-local work files and reports without installing tools or
+   mutating external asset/provider directories.
+9. Register the final Godot scene, animations, and secondary assets back into the same character manifest when downstream work completes.
 
 The setup tab shows Godot-style local status indicators for ComfyUI found/running, ComfyUI nodes/models, Blender, Ollama, animation assets, and the base character scene. The scene field defaults to `res://scenes/base_characters.tscn`; use **Load base character scene** when a consuming project provides that scene with its mannequin characters for rigged-mesh inspection. This is separate from the project's normal `main.tscn` entry scene.
 
@@ -73,6 +80,10 @@ godot --no-header --headless --path . --script res://addons/build_me_godot/cli/c
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- queue --character-id field_engineer
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve --character-id field_engineer --version v1
 godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- continue --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- create-recipe --character-id field_engineer --version v1 --game-mode-profile-id 3d_isometric_party
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- validate-recipe --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- approve-recipe --character-id field_engineer --version v1
+godot --no-header --headless --path . --script res://addons/build_me_godot/cli/character_cli.gd -- register-assembly --character-id field_engineer --version v1 --assembly-report res://build_me_godot/characters/field_engineer/assembly/v1/assembly_report.json
 ```
 
 With `--no-header`, these commands emit JSON on stdout. Mutating commands only update project-local files under `res://build_me_godot/`; they do not install ComfyUI nodes, download model weights, run Blender, or start unrelated pipeline stages.
@@ -155,12 +166,14 @@ Open this repository directly in Godot to exercise the addon. A character is rep
 ```bash
 godot --headless --editor --path . --quit
 godot --headless --path . --script res://tests/test_character_store.gd
+godot --headless --path . --script res://tests/test_isometric_playtest.gd
 bash tests/test_character_cli.sh
 bash tests/test_comfyui_client.sh
 godot --headless --editor --path . --script res://tests/test_build_me_godot_dock_smoke.gd --quit
 PYTHONPYCACHEPREFIX=/tmp/build-me-godot-pycache python3 -m py_compile \
   tests/mock_comfyui_server.py \
   addons/build_me_godot/integrations/comfyui/character_turnaround_output.py \
+  addons/build_me_godot/integrations/blender/assemble_isometric_character.py \
   addons/build_me_godot/integrations/blender/build_humanoid_character.py \
   addons/build_me_godot/integrations/blender/validate_deformation.py \
   build_me_godot/blender/tools/prepare_rigify_face_experiment.py \

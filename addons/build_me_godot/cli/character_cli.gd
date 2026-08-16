@@ -72,6 +72,30 @@ func _run() -> void:
 			result = store.continue_pipeline(str(parsed.values.get("character_id", "")), parsed.values)
 		"inspect-conformance":
 			result = store.inspect_conformance(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"create-recipe":
+			result = store.create_character_recipe(str(parsed.values.get("character_id", "")), parsed.values)
+		"inspect-recipe":
+			result = store.inspect_character_recipe(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"validate-recipe":
+			result = store.validate_character_recipe(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"approve-recipe":
+			result = store.approve_character_recipe(str(parsed.values.get("character_id", "")), parsed.values)
+		"register-assembly":
+			result = store.register_assembly_result(str(parsed.values.get("character_id", "")), parsed.values)
+		"checkpoint-status":
+			result = store.checkpoint_status(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"write-checkpoints":
+			result = store.write_character_checkpoints(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"invalidate-stage":
+			result = store.invalidate_checkpoint_stage(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")), str(parsed.values.get("stage", "")), str(parsed.values.get("reason", "")))
+		"mark-reviewed":
+			result = store.mark_checkpoint_reviewed(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")), str(parsed.values.get("stage", "")))
+		"explain-stale":
+			result = store.explain_stale_checkpoints(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")))
+		"resume-from-stage":
+			result = store.resume_from_checkpoint(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")), str(parsed.values.get("stage", "")))
+		"reuse-base-checkpoint":
+			result = store.reuse_base_checkpoint(str(parsed.values.get("character_id", "")), str(parsed.values.get("version", "")), str(parsed.values.get("source_character_id", "")), str(parsed.values.get("source_version", "")))
 		"prepare-conformance":
 			result = store.prepare_conformance(str(parsed.values.get("character_id", "")), parsed.values)
 		"generate-proxy":
@@ -93,7 +117,15 @@ func _run() -> void:
 		"changed_paths": result.get("changed_paths", []),
 		"conformance_plan_path": result.get("conformance_plan_path", ""),
 		"conformance_plan": result.get("conformance_plan", {}),
-		"mesh_guidance": result.get("mesh_guidance", {})
+		"mesh_guidance": result.get("mesh_guidance", {}),
+		"recipe_path": result.get("recipe_path", ""),
+		"recipe": result.get("recipe", {}),
+		"recipe_validation": result.get("recipe_validation", {}),
+		"assembly_report": result.get("assembly_report", {}),
+		"registration_report": result.get("registration_report", {}),
+		"checkpoint_path": result.get("checkpoint_path", ""),
+		"checkpoint_index": result.get("checkpoint_index", {}),
+		"stale_explanations": result.get("stale_explanations", [])
 	}
 	if bool(parsed.get("support_report", false)):
 		output = _redact_support_output(output)
@@ -102,8 +134,9 @@ func _run() -> void:
 
 
 func _parse_args(arguments: PackedStringArray) -> Dictionary:
-	if arguments.is_empty() or arguments[0] not in ["draft", "import-workflow", "inspect", "queue", "approve", "continue", "inspect-conformance", "prepare-conformance", "generate-proxy", "approve-conformance"]:
-		return {"ok": false, "error": "Usage: draft|import-workflow|inspect|queue|approve|continue|inspect-conformance|prepare-conformance|generate-proxy|approve-conformance --character-id ID [options]"}
+	var commands := ["draft", "import-workflow", "inspect", "queue", "approve", "continue", "inspect-conformance", "create-recipe", "inspect-recipe", "validate-recipe", "approve-recipe", "register-assembly", "checkpoint-status", "write-checkpoints", "invalidate-stage", "mark-reviewed", "explain-stale", "resume-from-stage", "reuse-base-checkpoint", "prepare-conformance", "generate-proxy", "approve-conformance"]
+	if arguments.is_empty() or arguments[0] not in commands:
+		return {"ok": false, "error": "Usage: %s --character-id ID [options]" % "|".join(PackedStringArray(commands))}
 	var result := {
 		"ok": true,
 		"command": arguments[0],
@@ -143,6 +176,17 @@ func _parse_args(arguments: PackedStringArray) -> Dictionary:
 			"--workflow-path": result.values["workflow_path"] = value
 			"--workflow-id": result.values["workflow_id"] = value
 			"--workflow-version": result.values["workflow_version"] = value
+			"--recipe-version": result.values["recipe_version"] = value
+			"--game-mode-profile-id": result.values["game_mode_profile_id"] = value
+			"--body-provider": result.values["body_provider"] = value
+			"--texture-budget": result.values["texture_budget"] = value
+			"--atlas-group": result.values["atlas_group"] = value
+			"--assembly-report": result.values["assembly_report"] = value
+			"--character-scene": result.values["character_scene"] = value
+			"--stage": result.values["stage"] = value
+			"--reason": result.values["reason"] = value
+			"--source-character-id": result.values["source_character_id"] = value
+			"--source-version": result.values["source_version"] = value
 			"--warnings-acknowledged": result.values["warnings_acknowledged"] = value.to_lower() in ["1", "true", "yes", "y"]
 			"--reconstruction-command": result.values["reconstruction_command"] = value
 			"--provider-id": result.values["provider_id"] = value
@@ -166,6 +210,10 @@ func _parse_args(arguments: PackedStringArray) -> Dictionary:
 		return {"ok": false, "error": "--workflow-path is required for import-workflow"}
 	if result.command in ["approve", "continue", "prepare-conformance", "generate-proxy", "approve-conformance"] and not result.values.has("version"):
 		return {"ok": false, "error": "--version is required for %s" % result.command}
+	if result.command in ["invalidate-stage", "mark-reviewed", "resume-from-stage"] and not result.values.has("stage"):
+		return {"ok": false, "error": "--stage is required for %s" % result.command}
+	if result.command == "reuse-base-checkpoint" and (not result.values.has("source_character_id") or not result.values.has("source_version") or not result.values.has("version")):
+		return {"ok": false, "error": "--source-character-id, --source-version, and --version are required for reuse-base-checkpoint"}
 	return result
 
 

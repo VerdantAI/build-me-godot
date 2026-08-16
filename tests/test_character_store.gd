@@ -138,11 +138,137 @@ func _init() -> void:
 	if not _check(approved.ok, approved.get("error", "approval failed")): return
 	if not _check(approved.manifest.generation.selected_version == "v2", "selected version was not recorded"): return
 	if not _check(approved.manifest.stage == "reference_approved", "approval stage was not recorded"): return
+	var recipe := store.create_character_recipe("draft_character", {
+		"version": "v2",
+		"game_mode_profile_id": "3d_isometric_party",
+		"texture_budget": "medium"
+	})
+	if not _check(recipe.ok, recipe.get("error", "recipe creation failed")): return
+	if not _check(recipe.manifest.stage == "recipe_draft", "recipe draft stage was not recorded"): return
+	if not _check(recipe.recipe.character_id == "draft_character", "recipe character ID was not recorded"): return
+	if not _check(recipe.recipe.reference_version == "v2", "recipe reference version was not recorded"): return
+	if not _check(recipe.recipe.game_mode_profile_id == "3d_isometric_party", "recipe game mode was not recorded"): return
+	if not _check(recipe.recipe.body.provider == "project_rigged_meshes", "recipe body provider should default to project rigged meshes"): return
+	if not _check(recipe.recipe.body.rigged_meshes.primary == primary_source_mesh, "recipe did not capture primary rigged mesh"): return
+	if not _check(recipe.recipe.source.reference_outputs.front.ends_with("references/v2/front.png"), "recipe did not link approved concept output"): return
+	if not _check(recipe.recipe.source.ai_assistance[0].tool == "comfyui", "recipe did not link ComfyUI source provenance"): return
+	if not _check(recipe.recipe.equipment.size() > 0, "recipe equipment plan was not populated"): return
+	if not _check(recipe.recipe_validation.status in ["pass", "warning"], "valid recipe should not fail validation"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/recipes/v2/character_recipe.json")), "recipe file was not written"): return
+	if not _check(recipe.changed_paths.has(test_root.path_join("characters/draft_character/recipes/v2/character_recipe.json")), "recipe changed path was not reported"): return
+	var inspected_recipe := store.inspect_character_recipe("draft_character", "v2")
+	if not _check(inspected_recipe.ok, inspected_recipe.get("error", "recipe inspect failed")): return
+	if not _check(inspected_recipe.recipe_path.ends_with("recipes/v2/character_recipe.json"), "recipe inspect path was not reported"): return
+	if not _check(inspected_recipe.recipe_validation.status in ["pass", "warning"], "recipe inspect validation should not fail"): return
+	var recipe_validation := store.validate_character_recipe("draft_character", "v2")
+	if not _check(recipe_validation.ok, recipe_validation.get("error", "recipe validation failed")): return
+	if not _check(recipe_validation.recipe_validation.status in ["pass", "warning"], "stored recipe should validate"): return
+	var invalid_recipe := store.create_character_recipe("draft_character", {
+		"version": "v2",
+		"recipe_version": "bad_proxy_body",
+		"body_provider": "triposr"
+	})
+	if not _check(invalid_recipe.ok, invalid_recipe.get("error", "invalid recipe should still be recorded for review")): return
+	if not _check(invalid_recipe.recipe_validation.status == "failed", "proxy body promotion should fail validation"): return
+	var rejected_recipe_approval := store.approve_character_recipe("draft_character", {"version": "bad_proxy_body"})
+	if not _check(not rejected_recipe_approval.ok and str(rejected_recipe_approval.error).contains("validation failed"), "invalid recipe approval should be blocked"): return
+	var approved_recipe := store.approve_character_recipe("draft_character", {"version": "v2"})
+	if not _check(approved_recipe.ok, approved_recipe.get("error", "recipe approval failed")): return
+	if not _check(approved_recipe.manifest.stage == "recipe_approved", "recipe approval stage was not recorded"): return
+	if not _check(approved_recipe.manifest.recipes.selected_version == "v2", "approved recipe version was not recorded"): return
+	if not _check(approved_recipe.manifest.recipes.versions.v2.status == "approved", "approved recipe status was not recorded"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/checkpoints/v2/checkpoint_index.json")), "recipe approval did not write checkpoint index"): return
+	if not _check(approved_recipe.checkpoint_index.stages.recipe.status == "valid", "recipe checkpoint was not valid after approval"): return
+	if not _check(approved_recipe.checkpoint_index.stages.base_body.status == "valid", "base body checkpoint was not valid after approval"): return
+	if not _check(approved_recipe.checkpoint_index.stages.assembly.status == "missing", "assembly checkpoint should be missing before assembly registration"): return
+	var checkpoint_path := test_root.path_join("characters/draft_character/checkpoints/v2/checkpoint_index.json")
+	var checkpoint_before = JSON.parse_string(_read_text(checkpoint_path))
+	checkpoint_before["x_unknown_top_level"] = "preserve-me"
+	checkpoint_before.stages.recipe["x_unknown_stage_field"] = "preserve-stage"
+	_write_text(checkpoint_path, JSON.stringify(checkpoint_before, "  ") + "\n")
+	var rewritten_checkpoint := store.write_character_checkpoints("draft_character", "v2")
+	if not _check(rewritten_checkpoint.ok, rewritten_checkpoint.get("error", "checkpoint rewrite failed")): return
+	if not _check(rewritten_checkpoint.checkpoint_index.x_unknown_top_level == "preserve-me", "checkpoint update did not preserve unknown top-level fields"): return
+	if not _check(rewritten_checkpoint.checkpoint_index.stages.recipe.x_unknown_stage_field == "preserve-stage", "checkpoint update did not preserve unknown stage fields"): return
+	var assembly_dir := test_root.path_join("characters/draft_character/assembly/v2")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(assembly_dir))
+	var assembly_report_path := assembly_dir.path_join("assembly_report.json")
+	var assembly_report := {
+		"schema_version": 1,
+		"status": "assembled",
+		"character_id": "draft_character",
+		"recipe_version": "v2",
+		"recipe_path": test_root.path_join("characters/draft_character/recipes/v2/character_recipe.json"),
+		"warnings": [],
+		"body_source": primary_source_mesh,
+		"body_objects": ["Armature", "Body"],
+		"reference_images": [test_root.path_join("characters/draft_character/references/v2/front.png")],
+		"sockets": [
+			{"name": "hand_r", "parent_bone": "RightHand", "required": true},
+			{"name": "hand_l", "parent_bone": "LeftHand", "required": true}
+		],
+		"equipment": [
+			{"part_id": "tool", "socket": "hand_r", "representation": "primitive", "object": "EQUIP_tool"}
+		],
+		"outputs": {
+			"blender_work_file": assembly_dir.path_join("draft_character_v2_isometric_assembly.blend"),
+			"godot_import_asset": assembly_dir.path_join("draft_character_v2_isometric_assembly.glb"),
+			"assembly_report": assembly_report_path
+		}
+	}
+	var assembly_file := FileAccess.open(assembly_report_path, FileAccess.WRITE)
+	assembly_file.store_string(JSON.stringify(assembly_report, "  ") + "\n")
+	assembly_file.close()
+	_write_text(assembly_dir.path_join("draft_character_v2_isometric_assembly.glb"), "fake glb bytes")
+	var registered_assembly := store.register_assembly_result("draft_character", {
+		"version": "v2",
+		"assembly_report": assembly_report_path
+	})
+	if not _check(registered_assembly.ok, registered_assembly.get("error", "assembly registration failed")): return
+	if not _check(registered_assembly.manifest.stage == "assembly_registered", "assembly registration stage was not recorded"): return
+	if not _check(registered_assembly.manifest.assets.character_scene.ends_with("draft_character.tscn"), "assembly registration did not create character scene path"): return
+	if not _check(registered_assembly.manifest.assets.godot_import_asset.ends_with("draft_character_v2_isometric_assembly.glb"), "assembly registration did not record GLB import asset"): return
+	if not _check(registered_assembly.manifest.assets.animations.has("res://addons/build_me_godot/examples/quaternius_ik_rigged/UAL1_Standard.animation_library.tres"), "assembly registration did not record animation library"): return
+	if not _check(registered_assembly.manifest.assets.sockets.size() == 2, "assembly registration did not record sockets"): return
+	if not _check(registered_assembly.manifest.assets.secondary_assets[0].asset_id == "tool", "assembly registration did not convert equipment to secondary assets"): return
+	if not _check(registered_assembly.manifest.assets.preview_readability.status == "pending", "assembly registration should record pending preview evidence"): return
+	if not _check(registered_assembly.checkpoint_index.stages.assembly.status == "valid", "assembly checkpoint was not valid after registration"): return
+	if not _check(registered_assembly.checkpoint_index.stages.godot_scene.status == "valid", "Godot scene checkpoint was not valid after registration"): return
+	if not _check(registered_assembly.checkpoint_index.stages.animation_smoke.status == "valid", "animation checkpoint was not valid after registration"): return
+	if not _check(registered_assembly.checkpoint_index.stages.readability.status == "pending", "readability checkpoint should remain pending"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/draft_character.tscn")), "assembly registration did not write Godot scene wrapper"): return
+	var scene_text := _read_text(test_root.path_join("characters/draft_character/draft_character.tscn"))
+	if not _check(scene_text.contains("AnimationPlayer"), "assembly registration did not add an AnimationPlayer"): return
+	if not _check(scene_text.contains("root_node = NodePath(\"../Model\")"), "assembly registration did not root animations at the imported model"): return
+	if not _check(scene_text.contains("UAL1_Standard.animation_library.tres"), "assembly registration did not link the animation library"): return
+	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/reports/v2/isometric_character_registration.json")), "assembly registration report was not written"): return
 	var resaved_draft := store.save_draft({"character_id": "draft_character", "prompt": "updated after approval"})
 	if not _check(resaved_draft.ok, resaved_draft.get("error", "resave draft failed")): return
 	if not _check(resaved_draft.manifest.generation.runs.size() == 2, "draft resave wiped generation runs"): return
 	if not _check(resaved_draft.manifest.generation.selected_version == "v2", "draft resave wiped selected version"): return
-	if not _check(resaved_draft.manifest.stage == "reference_approved", "draft resave regressed stage"): return
+	if not _check(resaved_draft.manifest.stage == "assembly_registered", "draft resave regressed stage"): return
+	if not _check(resaved_draft.manifest.recipes.selected_version == "v2", "draft resave wiped selected recipe"): return
+	var second_character := store.save_character({
+		"character_id": "second_character",
+		"display_name": "Second Character",
+		"metadata": {"role": "test reuse", "style": "isometric fixture", "pose_contract": "neutral_a_pose_30deg_v1"},
+		"prompt": "second character that reuses a base",
+		"rigged_meshes": {
+			"primary": primary_source_mesh,
+			"secondary": secondary_source_mesh
+		}
+	})
+	if not _check(second_character.ok, second_character.get("error", "second character save failed")): return
+	var reused_base := store.reuse_base_checkpoint("second_character", "v1", "draft_character", "v2")
+	if not _check(reused_base.ok, reused_base.get("error", "base checkpoint reuse failed")): return
+	if not _check(reused_base.checkpoint_index.stages.base_body.status == "valid", "reused base checkpoint should be valid"): return
+	if not _check(reused_base.checkpoint_index.stages.animation_smoke.status == "valid", "reused animation checkpoint should be valid"): return
+	if not _check(reused_base.checkpoint_index.stages.base_body.reused_from.character_id == "draft_character", "reused base provenance was not recorded"): return
+	_write_text(test_root.path_join("characters/draft_character/draft_character.tscn"), scene_text + "\n# changed after checkpoint\n")
+	var stale_checkpoint := store.checkpoint_status("draft_character", "v2")
+	if not _check(stale_checkpoint.ok, stale_checkpoint.get("error", "checkpoint status failed")): return
+	if not _check(stale_checkpoint.checkpoint_index.stages.godot_scene.status == "stale", "changed scene digest should mark Godot scene checkpoint stale"): return
+	if not _check(stale_checkpoint.checkpoint_index.stages.animation_smoke.status == "stale", "animation smoke should become stale when Godot scene changes"): return
 	var missing_version := store.approve_generation_version("draft_character", "v99")
 	if not _check(not missing_version.ok, "missing version approval should fail"): return
 	var unapproved_conformance := store.prepare_conformance("test_character", {"version": "v1"})
@@ -353,6 +479,44 @@ func _init() -> void:
 	if not _check(handoff_requirements.outputs.guidance_required_fields.has("prop_candidates"), "conformance guidance requirements must declare prop candidates"): return
 	if not _check(handoff_requirements.outputs.required_files.has("{target_rig}/conformance_guidance.json"), "conformance handoff requirements must declare target-scoped guidance JSON"): return
 	if not _check(handoff_requirements.outputs.required_files.has("{target_rig}/overlays/front_silhouette_overlay.svg"), "conformance handoff requirements must declare target-scoped front overlay preview"): return
+	var assembly_requirements_file := FileAccess.open("res://addons/build_me_godot/integrations/blender/assemble_isometric_character.requirements.json", FileAccess.READ)
+	if not _check(assembly_requirements_file != null, "isometric assembly requirements could not be opened"): return
+	var assembly_requirements = JSON.parse_string(assembly_requirements_file.get_as_text())
+	if not _check(assembly_requirements is Dictionary and assembly_requirements.tool_id == "assemble_isometric_character", "isometric assembly requirements are malformed"): return
+	if not _check(assembly_requirements.game_mode_profile_id == "3d_isometric_party", "isometric assembly requirements must declare game mode"): return
+	if not _check(assembly_requirements.outputs.report_required_fields.has("equipment"), "isometric assembly report must declare equipment output"): return
+	if not _check(assembly_requirements.outputs.godot_import_asset_suffix == "_isometric_assembly.glb", "isometric assembly requirements must declare GLB output"): return
+	if not _check(assembly_requirements.outputs.work_file_directory == "source", "isometric assembly work files must be isolated from runtime imports"): return
+	var provider_file := FileAccess.open("res://addons/build_me_godot/integrations/humanoid_providers.json", FileAccess.READ)
+	if not _check(provider_file != null, "humanoid provider records could not be opened"): return
+	var provider_records = JSON.parse_string(provider_file.get_as_text())
+	if not _check(provider_records is Dictionary and provider_records.automatic_downloads_allowed == false, "humanoid provider records must be local-only"): return
+	var saw_project_provider := false
+	var saw_blocked_smplx := false
+	for provider in provider_records.providers:
+		if provider.provider_id == "project_rigged_meshes" and provider.status == "preferred_first_slice":
+			saw_project_provider = true
+		if provider.provider_id == "smplx_research" and provider.status == "blocked_for_default_production" and provider.requires_smplx:
+			saw_blocked_smplx = true
+	if not _check(saw_project_provider, "humanoid provider records must include project rigged meshes"): return
+	if not _check(saw_blocked_smplx, "humanoid provider records must block SMPL-X by default"): return
+	var reusable_base_file := FileAccess.open("res://addons/build_me_godot/integrations/reusable_base_candidates.json", FileAccess.READ)
+	if not _check(reusable_base_file != null, "reusable base candidate records could not be opened"): return
+	var reusable_base_records = JSON.parse_string(reusable_base_file.get_as_text())
+	if not _check(reusable_base_records is Dictionary and reusable_base_records.automatic_downloads_allowed == false, "reusable base records must be local-only"): return
+	var saw_production_base := false
+	var saw_research_reference := false
+	for candidate in reusable_base_records.candidates:
+		if candidate.provider_id == "project_rigged_meshes" and candidate.production_candidate and candidate.pose_contract == "neutral_a_pose_30deg_v1":
+			saw_production_base = true
+		if candidate.provider_id == "research_reference" and candidate.research_reference_only and not candidate.production_candidate:
+			saw_research_reference = true
+	if not _check(saw_production_base, "reusable base records must include reviewed project rigged meshes"): return
+	if not _check(saw_research_reference, "reusable base records must keep research providers reference-only"): return
+	var recipe_prompt := FileAccess.open("res://addons/build_me_godot/templates/recipe_drafting_prompt.md", FileAccess.READ)
+	if not _check(recipe_prompt != null, "recipe drafting prompt could not be opened"): return
+	var recipe_prompt_text := recipe_prompt.get_as_text()
+	if not _check(recipe_prompt_text.contains("Return JSON only") and recipe_prompt_text.contains("automatic_downloads_allowed"), "recipe drafting prompt must require structured local-safe output"): return
 	var fixture_file := FileAccess.open("res://tests/fixtures/environment_reports.json", FileAccess.READ)
 	if not _check(fixture_file != null, "environment fixtures could not be opened"): return
 	var fixtures = JSON.parse_string(fixture_file.get_as_text())

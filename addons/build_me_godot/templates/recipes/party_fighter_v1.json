@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "character_id": "party_fighter",
+  "display_name": "Party Fighter",
+  "recipe_version": "v1",
+  "reference_version": "v1",
+  "game_mode_profile_id": "3d_isometric_party",
+  "source": {
+    "manifest_path": "",
+    "manifest_stage": "reference_approved",
+    "approved_reference_run": "",
+    "approved_reference_version": "v1",
+    "reference_outputs": {},
+    "prompt_targets": {
+      "silhouette": ["armor", "weapon", "shield"],
+      "materials": ["worn_leather", "brushed_metal", "muted_cloth"],
+      "colors": ["steel", "oxblood", "dark_cloth"],
+      "props": [
+        {"asset_id": "sword", "socket": "hand_r"},
+        {"asset_id": "shield", "socket": "hand_l"}
+      ]
+    },
+    "ai_assistance": []
+  },
+  "body": {
+    "strategy": "canonical_humanoid",
+    "provider": "project_rigged_meshes",
+    "provider_provenance": {
+      "provider_id": "project_rigged_meshes",
+      "role": "production_body",
+      "license_record": "project_user_supplied",
+      "license_state": "reviewed_or_user_supplied",
+      "commercial_use": true,
+      "locality": "project_local_or_user_managed",
+      "automatic_downloads_allowed": false,
+      "source": "template"
+    },
+    "production_topology_candidate": true,
+    "pose_contract": "neutral_a_pose_30deg_v1",
+    "scale_meters": 1.8,
+    "rigged_meshes": {
+      "primary": "",
+      "secondary": ""
+    },
+    "morph_targets": {},
+    "manual_review_required": []
+  },
+  "equipment": [
+    {
+      "part_id": "main_weapon",
+      "taxonomy": "inorganic_mechanical",
+      "representation": "primitive",
+      "socket": "hand_r",
+      "required": true,
+      "source_kind": "placeholder_primitive",
+      "production_status": "planned",
+      "promote_to_production": false,
+      "provider_provenance": {
+        "provider_id": "placeholder_primitive",
+        "role": "equipment_or_prop",
+        "license_record": "placeholder_primitive",
+        "license_state": "reviewed_or_user_supplied",
+        "commercial_use": true,
+        "locality": "project_local_or_user_managed",
+        "automatic_downloads_allowed": false,
+        "source": "template"
+      }
+    },
+    {
+      "part_id": "shield",
+      "taxonomy": "inorganic_mechanical",
+      "representation": "primitive",
+      "socket": "hand_l",
+      "required": true,
+      "source_kind": "placeholder_primitive",
+      "production_status": "planned",
+      "promote_to_production": false,
+      "provider_provenance": {
+        "provider_id": "placeholder_primitive",
+        "role": "equipment_or_prop",
+        "license_record": "placeholder_primitive",
+        "license_state": "reviewed_or_user_supplied",
+        "commercial_use": true,
+        "locality": "project_local_or_user_managed",
+        "automatic_downloads_allowed": false,
+        "source": "template"
+      }
+    }
+  ],
+  "sockets": [
+    {"name": "hand_r", "parent_bone": "RightHand", "required": true},
+    {"name": "hand_l", "parent_bone": "LeftHand", "required": true},
+    {"name": "head", "parent_bone": "Head", "required": false},
+    {"name": "back", "parent_bone": "Chest", "required": false}
+  ],
+  "materials": {
+    "palette": ["steel", "oxblood", "dark_cloth"],
+    "material_families": ["worn_leather", "brushed_metal", "muted_cloth"],
+    "texture_budget": "medium",
+    "atlas_group": "isometric_party_humanoid_v1"
+  },
+  "animation": {
+    "profile": "SkeletonProfileHumanoid",
+    "required_clips": ["idle", "walk"],
+    "role_clips": ["attack"],
+    "retarget_source": "project_humanoid_library"
+  },
+  "lod": {
+    "strategy": "manual_lod",
+    "required_levels": ["lod0"],
+    "planned_levels": ["lod1"],
+    "impostor_optional": true
+  },
+  "validation": {
+    "camera_profile": "isometric_medium",
+    "requires_thumbnail_readability": true,
+    "requires_socket_report": true,
+    "requires_animation_smoke": true,
+    "requires_license_report": true,
+    "blocked_production_topology_sources": ["triposr", "trellis", "hunyuan3d_2", "smplx"]
+  },
+  "outputs": {
+    "recipe_path": "",
+    "blender_work_file": "",
+    "godot_scene": "",
+    "validation_report": "",
+    "isometric_preview": ""
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "capability": "canonical_humanoid_body_provider_readiness",
+  "automatic_downloads_allowed": false,
+  "providers": [
+    {
+      "provider_id": "project_rigged_meshes",
+      "display_name": "Project-provided humanoid rigged meshes",
+      "role": "production_body",
+      "status": "preferred_first_slice",
+      "locality": "project_local",
+      "license_state": "user_supplied_or_project_reviewed",
+      "commercial_use": "project_responsibility",
+      "requires_external_install": false,
+      "requires_model_weights": false,
+      "requires_blender_addon": false,
+      "requires_smplx": false,
+      "output_representation": "conventional_rigged_mesh",
+      "notes": "Fastest path for post-concept play-test characters. Validate pose, skeleton, sockets, and provenance before registration."
+    },
+    {
+      "provider_id": "mpfb_external",
+      "display_name": "MPFB2 / MakeHuman through user-managed Blender",
+      "role": "canonical_humanoid_body",
+      "status": "candidate_external",
+      "locality": "user_managed_external",
+      "license_state": "review_required_per_install_and_output",
+      "commercial_use": "depends_on_asset_and_project_review",
+      "requires_external_install": true,
+      "requires_model_weights": false,
+      "requires_blender_addon": true,
+      "requires_smplx": false,
+      "output_representation": "conventional_rigged_mesh_or_blender_scene",
+      "notes": "Do not bundle MPFB/MakeHuman code or install it automatically. Treat as an optional external Blender provider."
+    },
+    {
+      "provider_id": "makehuman_external",
+      "display_name": "MakeHuman external export",
+      "role": "canonical_humanoid_body",
+      "status": "candidate_external",
+      "locality": "user_managed_external",
+      "license_state": "review_required_per_install_and_output",
+      "commercial_use": "depends_on_asset_and_project_review",
+      "requires_external_install": true,
+      "requires_model_weights": false,
+      "requires_blender_addon": false,
+      "requires_smplx": false,
+      "output_representation": "conventional_rigged_mesh",
+      "notes": "Use explicit user export/import. Do not bundle or install MakeHuman source or assets automatically."
+    },
+    {
+      "provider_id": "smplx_research",
+      "display_name": "SMPL-X-backed research provider",
+      "role": "research_reference",
+      "status": "blocked_for_default_production",
+      "locality": "user_managed_external",
+      "license_state": "research_only_unless_separately_licensed",
+      "commercial_use": false,
+      "requires_external_install": true,
+      "requires_model_weights": true,
+      "requires_blender_addon": false,
+      "requires_smplx": true,
+      "output_representation": "research_body_or_reference",
+      "notes": "Never promote to default production body without a separate SMPL-X license decision record."
+    }
+  ]
+}

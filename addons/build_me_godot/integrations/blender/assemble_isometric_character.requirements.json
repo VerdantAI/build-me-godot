@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "tool_id": "assemble_isometric_character",
+  "capability": "isometric_character_recipe_assembly",
+  "license": "MIT",
+  "minimum_blender_version": "4.2",
+  "pose_contract": "neutral_a_pose_30deg_v1",
+  "game_mode_profile_id": "3d_isometric_party",
+  "configuration": {
+    "required": [
+      "recipe",
+      "project_root",
+      "output_dir"
+    ],
+    "optional": []
+  },
+  "external_mutation_allowed": false,
+  "automatic_downloads_allowed": false,
+  "outputs": {
+    "report": "assembly_report.json",
+    "report_required_fields": [
+      "schema_version",
+      "status",
+      "character_id",
+      "recipe_version",
+      "recipe_path",
+      "warnings",
+      "body_source",
+      "body_objects",
+      "reference_images",
+      "sockets",
+      "equipment",
+      "outputs"
+    ],
+    "work_file_directory": "source",
+    "work_file_suffix": "_isometric_assembly.blend",
+    "godot_import_asset_suffix": "_isometric_assembly.glb"
+  },
+  "notes": [
+    "Creates duplicate-only project-local work files from a validated recipe.",
+    "Stores Blender work files under source/.gdignore so Godot imports only runtime assets from the assembly directory.",
+    "Does not install Blender addons, ComfyUI nodes, Python packages, model weights, or asset packs.",
+    "Placeholder equipment is for play-test assembly planning and review, not final authored art."
+  ]
+}

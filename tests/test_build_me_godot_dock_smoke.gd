@@ -25,6 +25,9 @@ func _run() -> void:
 	if not _check(dock.status_indicators["example.scene"].value.text == "Yes", "packaged base scene should be available"): return
 	if not _check(_base_character_scene_has_rigged_mannequins(), "packaged base scene should contain two rigged mannequins with animations"): return
 	if not _check(_has_menu_item_text(dock, "Save JSON report"), "dock setup did not expose a Save JSON report action"): return
+	if not _check(_has_button_text(dock, "Write checkpoints"), "dock did not expose checkpoint writing"): return
+	if not _check(_has_button_text(dock, "Explain stale"), "dock did not expose stale checkpoint explanations"): return
+	if not _check(_has_button_text(dock, "Resume scene"), "dock did not expose scene resume from checkpoint"): return
 	dock._begin_dependency_check(false)
 	if not _check(dock.dependency_check_button.disabled, "dependency button was not disabled while checking"): return
 	if not _check(dock.status_indicators["comfyui.nodes"].value.text.contains("Checking"), "ComfyUI node status did not show the spinner state"): return
@@ -74,6 +77,9 @@ func _run() -> void:
 	dock._refresh_review(completed.manifest)
 	if not _check(dock.run_select.item_count == 1, "dock review did not list the completed run"): return
 	if not _check(dock.run_details.text.contains("Version: v1"), "dock review did not render run details"): return
+	dock._write_checkpoint_index()
+	if not _check(dock.checkpoint_details.text.contains("Version: v1"), "dock checkpoint tab did not render the selected version"): return
+	if not _check(dock.checkpoint_details.text.contains("References"), "dock checkpoint tab did not render stage rows"): return
 
 	dock._approve_selected_run()
 	var approved := store.load_character("dock_smoke")

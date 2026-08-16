@@ -65,6 +65,9 @@ var pending_generation_version := ""
 var run_select: OptionButton
 var reference_preview: TextureRect
 var run_details: RichTextLabel
+var checkpoint_stage_select: OptionButton
+var checkpoint_reason: LineEdit
+var checkpoint_details: RichTextLabel
 var dependency_check_button: Button
 var deep_check_button: Button
 var dependency_spinner: Timer
@@ -263,6 +266,48 @@ func _build_ui() -> void:
 	open_comfy_button.pressed.connect(_open_selected_run_in_comfyui)
 	review_buttons.add_child(open_comfy_button)
 	review_tab.add_child(review_buttons)
+
+	var checkpoint_tab := _add_tab(tabs, "5 Checkpoints")
+	checkpoint_stage_select = OptionButton.new()
+	checkpoint_stage_select.tooltip_text = "Checkpoint stage for review and invalidation actions"
+	for stage_name in CharacterStore.CHECKPOINT_STAGE_ORDER:
+		checkpoint_stage_select.add_item(stage_name)
+		checkpoint_stage_select.set_item_metadata(checkpoint_stage_select.item_count - 1, stage_name)
+	_add_labeled_control(checkpoint_tab, "Stage", checkpoint_stage_select)
+	checkpoint_reason = _add_line_edit(checkpoint_tab, "Reason", "Manual checkpoint update from Godot dock")
+	var checkpoint_buttons := HBoxContainer.new()
+	var refresh_checkpoint_button := Button.new()
+	refresh_checkpoint_button.text = "Refresh checkpoints"
+	refresh_checkpoint_button.pressed.connect(_refresh_checkpoint_status)
+	checkpoint_buttons.add_child(refresh_checkpoint_button)
+	var write_checkpoint_button := Button.new()
+	write_checkpoint_button.text = "Write checkpoints"
+	write_checkpoint_button.pressed.connect(_write_checkpoint_index)
+	checkpoint_buttons.add_child(write_checkpoint_button)
+	var explain_checkpoint_button := Button.new()
+	explain_checkpoint_button.text = "Explain stale"
+	explain_checkpoint_button.pressed.connect(_explain_stale_checkpoints)
+	checkpoint_buttons.add_child(explain_checkpoint_button)
+	checkpoint_tab.add_child(checkpoint_buttons)
+	var checkpoint_stage_buttons := HBoxContainer.new()
+	var mark_reviewed_button := Button.new()
+	mark_reviewed_button.text = "Mark reviewed"
+	mark_reviewed_button.pressed.connect(_mark_selected_checkpoint_reviewed)
+	checkpoint_stage_buttons.add_child(mark_reviewed_button)
+	var invalidate_button := Button.new()
+	invalidate_button.text = "Invalidate stage"
+	invalidate_button.pressed.connect(_invalidate_selected_checkpoint_stage)
+	checkpoint_stage_buttons.add_child(invalidate_button)
+	var resume_scene_button := Button.new()
+	resume_scene_button.text = "Resume scene"
+	resume_scene_button.tooltip_text = "Reuse a valid assembly checkpoint to register the Godot scene"
+	resume_scene_button.pressed.connect(_resume_godot_scene_from_checkpoint)
+	checkpoint_stage_buttons.add_child(resume_scene_button)
+	checkpoint_tab.add_child(checkpoint_stage_buttons)
+	checkpoint_details = RichTextLabel.new()
+	checkpoint_details.fit_content = true
+	checkpoint_details.custom_minimum_size.y = 160
+	checkpoint_tab.add_child(checkpoint_details)
 
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -463,6 +508,7 @@ func _on_character_selected(index: int) -> void:
 	secondary_rigged_mesh.text = str(rigged_meshes.get("secondary", CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH))
 	seed.value = int(manifest.get("seed", 0))
 	_refresh_review(manifest)
+	_refresh_checkpoint_status()
 	_set_status("Loaded %s" % result.path)
 
 
@@ -478,6 +524,7 @@ func _new_character() -> void:
 	secondary_rigged_mesh.text = CharacterStore.DEFAULT_SECONDARY_RIGGED_MESH
 	seed.value = 0
 	_refresh_review({})
+	_render_checkpoint_message("No character selected.")
 	_set_status("Edit the default prompt for this character, then save.")
 
 
@@ -495,6 +542,7 @@ func _save_character() -> Dictionary:
 	character_id.text = result.manifest.character_id
 	_refresh_characters(result.manifest.character_id)
 	_refresh_review(result.manifest)
+	_refresh_checkpoint_status()
 	_set_status("Saved %s" % result.path)
 	return result
 
@@ -605,6 +653,199 @@ func _selected_run_version() -> String:
 	return str(run_select.get_item_metadata(run_select.selected))
 
 
+func _selected_checkpoint_stage() -> String:
+	if checkpoint_stage_select == null or checkpoint_stage_select.item_count == 0 or checkpoint_stage_select.selected < 0:
+		return ""
+	return str(checkpoint_stage_select.get_item_metadata(checkpoint_stage_select.selected))
+
+
+func _selected_checkpoint_version(manifest: Dictionary) -> String:
+	var selected_run_version := _selected_run_version()
+	if not selected_run_version.is_empty():
+		return selected_run_version
+	var generation: Dictionary = manifest.get("generation", {})
+	var selected_version := str(generation.get("selected_version", ""))
+	if not selected_version.is_empty():
+		return selected_version
+	var runs: Array = generation.get("runs", [])
+	if not runs.is_empty() and runs[runs.size() - 1] is Dictionary:
+		return str(runs[runs.size() - 1].get("version", ""))
+	var recipes: Dictionary = manifest.get("recipes", {})
+	selected_version = str(recipes.get("selected_version", ""))
+	if not selected_version.is_empty():
+		return selected_version
+	return ""
+
+
+func _refresh_checkpoint_status() -> void:
+	if checkpoint_details == null:
+		return
+	var selected_character_id := character_id.text.strip_edges()
+	if selected_character_id.is_empty():
+		_render_checkpoint_message("No character selected.")
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_render_checkpoint_message(loaded.error)
+		return
+	var result := store.checkpoint_status(selected_character_id, _selected_checkpoint_version(loaded.manifest))
+	_render_checkpoint_result(result)
+
+
+func _write_checkpoint_index() -> void:
+	var selected_character_id := character_id.text.strip_edges()
+	if selected_character_id.is_empty():
+		_set_status("Select a character before writing checkpoints.", true)
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var result := store.write_character_checkpoints(selected_character_id, _selected_checkpoint_version(loaded.manifest))
+	_render_checkpoint_result(result)
+	if result.ok:
+		_set_status("Wrote %s" % result.checkpoint_path)
+	else:
+		_set_status(str(result.get("error", "Could not write checkpoints.")), true)
+
+
+func _explain_stale_checkpoints() -> void:
+	var selected_character_id := character_id.text.strip_edges()
+	if selected_character_id.is_empty():
+		_set_status("Select a character before explaining checkpoints.", true)
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var result := store.explain_stale_checkpoints(selected_character_id, _selected_checkpoint_version(loaded.manifest))
+	_render_checkpoint_result(result)
+	if result.ok:
+		_set_status("Checkpoint stale explanation refreshed.")
+	else:
+		_set_status(str(result.get("error", "Could not explain checkpoints.")), true)
+
+
+func _mark_selected_checkpoint_reviewed() -> void:
+	var selected_character_id := character_id.text.strip_edges()
+	var stage_name := _selected_checkpoint_stage()
+	if selected_character_id.is_empty() or stage_name.is_empty():
+		_set_status("Select a character and checkpoint stage before marking review.", true)
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var result := store.mark_checkpoint_reviewed(selected_character_id, _selected_checkpoint_version(loaded.manifest), stage_name)
+	_render_checkpoint_result(result)
+	if result.ok:
+		_set_status("Marked %s reviewed." % stage_name)
+	else:
+		_set_status(str(result.get("error", "Could not mark checkpoint reviewed.")), true)
+
+
+func _invalidate_selected_checkpoint_stage() -> void:
+	var selected_character_id := character_id.text.strip_edges()
+	var stage_name := _selected_checkpoint_stage()
+	if selected_character_id.is_empty() or stage_name.is_empty():
+		_set_status("Select a character and checkpoint stage before invalidating.", true)
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var reason := checkpoint_reason.text.strip_edges()
+	var result := store.invalidate_checkpoint_stage(selected_character_id, _selected_checkpoint_version(loaded.manifest), stage_name, reason)
+	_render_checkpoint_result(result)
+	if result.ok:
+		_set_status("Invalidated %s." % stage_name)
+	else:
+		_set_status(str(result.get("error", "Could not invalidate checkpoint stage.")), true)
+
+
+func _resume_godot_scene_from_checkpoint() -> void:
+	var selected_character_id := character_id.text.strip_edges()
+	if selected_character_id.is_empty():
+		_set_status("Select a character before resuming from checkpoint.", true)
+		return
+	var loaded := store.load_character(selected_character_id)
+	if not loaded.ok:
+		_set_status(loaded.error, true)
+		return
+	var result := store.resume_from_checkpoint(selected_character_id, _selected_checkpoint_version(loaded.manifest), "godot_scene")
+	_render_checkpoint_result(result)
+	if result.ok:
+		_refresh_review(result.manifest)
+		_set_status("Resumed Godot scene from assembly checkpoint.")
+	else:
+		_set_status(str(result.get("error", "Could not resume from checkpoint.")), true)
+
+
+func _render_checkpoint_result(result: Dictionary) -> void:
+	if checkpoint_details == null:
+		return
+	if not bool(result.get("ok", false)):
+		_render_checkpoint_message(str(result.get("error", "Checkpoint status unavailable.")))
+		return
+	var checkpoint: Dictionary = result.get("checkpoint_index", {})
+	var stages: Dictionary = checkpoint.get("stages", {})
+	var lines := PackedStringArray([
+		"Version: %s" % str(checkpoint.get("version", "")),
+		"Profile: %s" % str(checkpoint.get("game_mode_profile_id", "")),
+		"Path: %s" % str(result.get("checkpoint_path", ""))
+	])
+	for stage_name in CharacterStore.CHECKPOINT_STAGE_ORDER:
+		var stage: Dictionary = stages.get(stage_name, {})
+		lines.append("%s  %s  %s" % [
+			stage_name.capitalize(),
+			str(stage.get("status", "missing")),
+			_checkpoint_stage_summary(stage)
+		])
+	var explanations: Array = result.get("stale_explanations", [])
+	if not explanations.is_empty():
+		lines.append("")
+		lines.append("Stale / blocked stages")
+		for item in explanations:
+			if not item is Dictionary:
+				continue
+			lines.append("%s: %s" % [
+				str(item.get("stage", "")),
+				", ".join(_string_array(item.get("warnings", [])))
+			])
+	checkpoint_details.text = "\n".join(lines)
+
+
+func _render_checkpoint_message(message: String) -> void:
+	if checkpoint_details:
+		checkpoint_details.text = message
+
+
+func _checkpoint_stage_summary(stage: Dictionary) -> String:
+	if stage.is_empty():
+		return "not recorded"
+	for key in ["path", "report", "scene"]:
+		if not str(stage.get(key, "")).is_empty():
+			return str(stage.get(key, ""))
+	if stage.has("paths") and stage.paths is Array:
+		return "%d paths" % stage.paths.size()
+	if not str(stage.get("provider_id", "")).is_empty():
+		return str(stage.get("provider_id", ""))
+	var warnings := _string_array(stage.get("warnings", []))
+	if not warnings.is_empty():
+		return warnings[0]
+	return ""
+
+
+func _string_array(value) -> PackedStringArray:
+	var result := PackedStringArray()
+	if value is Array:
+		for item in value:
+			result.append(str(item))
+	elif not str(value).is_empty():
+		result.append(str(value))
+	return result
+
+
 func _load_reference_preview(outputs: Dictionary) -> void:
 	for key in ["turnaround_sheet", "contact_sheet", "front", "canonical"]:
 		if not outputs.has(key):
@@ -629,6 +870,7 @@ func _approve_selected_run() -> void:
 		_set_status(approved.error, true)
 		return
 	_refresh_review(approved.manifest)
+	_refresh_checkpoint_status()
 	_set_status("Approved %s." % version)
 
 
@@ -660,6 +902,7 @@ func _continue_selected_run() -> void:
 		_set_status(continued.error, true)
 		return
 	_refresh_review(continued.manifest)
+	_refresh_checkpoint_status()
 	_set_status("Pipeline enabled for %s." % version)
 
 
