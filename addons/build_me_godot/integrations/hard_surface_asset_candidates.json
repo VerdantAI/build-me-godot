@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "capability": "hard_surface_accessory_asset_candidates",
+  "automatic_downloads_allowed": false,
+  "reviewed_at": "2026-08-16",
+  "policy": {
+    "default_strategy": "prefer_reviewed_open_assets_before_procedural_generation",
+    "procedural_fallback": "allowed_only_when_explicitly_requested_in_recipe",
+    "project_storage": "res://build_me_godot/assets/",
+    "addon_storage": "metadata_only"
+  },
+  "candidates": [
+    {
+      "provider_id": "quaternius_fantasy_props_megakit",
+      "display_name": "Quaternius Fantasy Props MegaKit",
+      "source_url": "https://quaternius.com/?page_id=12",
+      "license": "CC0-1.0",
+      "commercial_use": true,
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["tool", "hammer", "pickaxe", "book_or_clipboard_proxy", "belt_or_pouch_proxy"],
+      "notes": "Best first candidate for hand tools and RPG-like hard-surface props. Exact per-file selection still needs user-managed import and license record."
+    },
+    {
+      "provider_id": "quaternius_ultimate_rpg_pack",
+      "display_name": "Quaternius Ultimate RPG Pack",
+      "source_url": "https://quaternius.com/?page_id=12",
+      "license": "CC0-1.0",
+      "commercial_use": true,
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["helmet", "belt_or_pouch_proxy", "hand_tool_proxy"],
+      "notes": "Good candidate for helmet-like silhouettes and small hard-surface props, but may skew fantasy rather than construction."
+    },
+    {
+      "provider_id": "kenney_factory_kit",
+      "display_name": "Kenney Factory Kit",
+      "source_url": "https://opengameart.org/content/factory-kit",
+      "license": "CC0-1.0",
+      "commercial_use": true,
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["industrial_props", "worksite_context", "background_equipment"],
+      "notes": "Good for surrounding worksite/industrial props, less likely to contain wearable hard hats or belts."
+    },
+    {
+      "provider_id": "kenney_all_in_one_or_relevant_3d_pack",
+      "display_name": "Kenney 3D packs",
+      "source_url": "https://kenney.nl/assets",
+      "license": "CC0-1.0",
+      "commercial_use": true,
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["clipboard_proxy", "tool_proxy", "industrial_or_city_context"],
+      "notes": "Use package-level search after explicit user download/import. Kenney packs are consistently CC0, but exact pack contents still need local inspection."
+    },
+    {
+      "provider_id": "poly_pizza_cc0_individual_models",
+      "display_name": "Poly Pizza public-domain individual models",
+      "source_url": "https://poly.pizza/",
+      "license": "asset_page_review_required",
+      "commercial_use": "depends_on_individual_asset",
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["hard_hat", "clipboard", "tool_belt", "hand_tool"],
+      "notes": "Useful for highly specific common props if the individual asset page confirms CC0/public-domain status."
+    },
+    {
+      "provider_id": "meshy_cc0_user_generated_models",
+      "display_name": "Meshy CC0 user-generated models",
+      "source_url": "https://www.meshy.ai/3d-models/",
+      "license": "asset_page_review_required",
+      "commercial_use": "depends_on_individual_asset",
+      "included": false,
+      "manual_import_required": true,
+      "automatic_downloads_allowed": false,
+      "fit": ["complete_construction_worker_reference", "hard_hat_reference"],
+      "notes": "Potential reference source only until individual model terms and generated-asset provenance are reviewed."
+    }
+  ]
+}

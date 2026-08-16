@@ -100,6 +100,24 @@ Blender/Godot import smoke test. The current `Rig_Test` action is a conservative
 deformation check, not a walk cycle. Full locomotion needs better weights or
 separated accessories before it is suitable for generated field-engineer meshes.
 
+### Current character-pipeline status
+
+The active post-concept slice is the `field_engineer` isometric character. It
+now uses a reviewed rigged base, character-local body/material customization,
+non-emissive PBR material export, animation-library validation, and checkpoint
+evidence. Placeholder equipment is intentionally excluded from production
+export.
+
+The next implementation step is the reusable shape library: explicitly import
+and license-review at least one common field-engineer accessory, reference it
+from the recipe by stable `shape_id`, attach it through the Blender assembly
+socket path, and make checkpoints depend on the reusable shape digest. Until a
+reviewed accessory is imported, the character is a valid pipeline smoke test
+but not yet a meaningfully customized production character.
+
+See [Character pipeline next steps](addons/build_me_godot/docs/character-pipeline-next-steps.md)
+for the current blocker, asset-search policy, and recommended next work.
+
 ## Local setup utilities
 
 Run the local requirement helper from this repository when preparing a Linux workstation:

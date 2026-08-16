@@ -150,6 +150,11 @@ func _init() -> void:
 	if not _check(recipe.recipe.game_mode_profile_id == "3d_isometric_party", "recipe game mode was not recorded"): return
 	if not _check(recipe.recipe.body.provider == "project_rigged_meshes", "recipe body provider should default to project rigged meshes"): return
 	if not _check(recipe.recipe.body.rigged_meshes.primary == primary_source_mesh, "recipe did not capture primary rigged mesh"): return
+	if not _check(recipe.recipe.body_variant.provider == "project_base_transform_controls", "recipe did not add a phase-1 body variant provider"): return
+	if not _check(recipe.recipe.body_variant.non_destructive, "body variant should be non-destructive"): return
+	if not _check(recipe.recipe.material_overrides.provider == "recipe_material_slot_overrides", "recipe did not add material override provider"): return
+	if not _check(recipe.recipe.material_overrides.slots.has("body_primary"), "material overrides did not include body_primary"): return
+	if not _check(recipe.recipe.validation_state.customization.meaningful_difference.status == "warning", "placeholder equipment should warn about incomplete meaningful customization"): return
 	if not _check(recipe.recipe.source.reference_outputs.front.ends_with("references/v2/front.png"), "recipe did not link approved concept output"): return
 	if not _check(recipe.recipe.source.ai_assistance[0].tool == "comfyui", "recipe did not link ComfyUI source provenance"): return
 	if not _check(recipe.recipe.equipment.size() > 0, "recipe equipment plan was not populated"): return
@@ -180,6 +185,7 @@ func _init() -> void:
 	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/checkpoints/v2/checkpoint_index.json")), "recipe approval did not write checkpoint index"): return
 	if not _check(approved_recipe.checkpoint_index.stages.recipe.status == "valid", "recipe checkpoint was not valid after approval"): return
 	if not _check(approved_recipe.checkpoint_index.stages.base_body.status == "valid", "base body checkpoint was not valid after approval"): return
+	if not _check(not str(approved_recipe.checkpoint_index.stages.assembly.customization_digest).is_empty(), "assembly checkpoint did not record customization digest"): return
 	if not _check(approved_recipe.checkpoint_index.stages.assembly.status == "missing", "assembly checkpoint should be missing before assembly registration"): return
 	var checkpoint_path := test_root.path_join("characters/draft_character/checkpoints/v2/checkpoint_index.json")
 	var checkpoint_before = JSON.parse_string(_read_text(checkpoint_path))
@@ -193,6 +199,19 @@ func _init() -> void:
 	var assembly_dir := test_root.path_join("characters/draft_character/assembly/v2")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(assembly_dir))
 	var assembly_report_path := assembly_dir.path_join("assembly_report.json")
+	var preview_path := test_root.path_join("characters/draft_character/previews/v2/isometric_readability.png")
+	var readability_report_path := test_root.path_join("characters/draft_character/reports/v2/isometric_readability.json")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(preview_path.get_base_dir()))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(readability_report_path.get_base_dir()))
+	_write_text(preview_path, "fake png bytes")
+	_write_text(readability_report_path, JSON.stringify({
+		"schema_version": 1,
+		"status": "valid",
+		"character_id": "draft_character",
+		"recipe_version": "v2",
+		"preview": preview_path,
+		"resolution": [512, 512]
+	}, "  ") + "\n")
 	var assembly_report := {
 		"schema_version": 1,
 		"status": "assembled",
@@ -210,10 +229,18 @@ func _init() -> void:
 		"equipment": [
 			{"part_id": "tool", "socket": "hand_r", "representation": "primitive", "object": "EQUIP_tool"}
 		],
+		"customization": {
+			"schema_version": 1,
+			"body_variant": {"status": "applied", "provider": "project_base_transform_controls"},
+			"material_overrides": {"status": "applied", "applied_slots": {"body_primary": [{"object": "Body"}]}},
+			"meaningful_difference": {"status": "partial", "material_identity": true, "body_variant": true, "silhouette_equipment": false}
+		},
 		"outputs": {
 			"blender_work_file": assembly_dir.path_join("draft_character_v2_isometric_assembly.blend"),
 			"godot_import_asset": assembly_dir.path_join("draft_character_v2_isometric_assembly.glb"),
-			"assembly_report": assembly_report_path
+			"assembly_report": assembly_report_path,
+			"readability_preview": preview_path,
+			"readability_report": readability_report_path
 		}
 	}
 	var assembly_file := FileAccess.open(assembly_report_path, FileAccess.WRITE)
@@ -231,11 +258,14 @@ func _init() -> void:
 	if not _check(registered_assembly.manifest.assets.animations.has("res://addons/build_me_godot/examples/quaternius_ik_rigged/UAL1_Standard.animation_library.tres"), "assembly registration did not record animation library"): return
 	if not _check(registered_assembly.manifest.assets.sockets.size() == 2, "assembly registration did not record sockets"): return
 	if not _check(registered_assembly.manifest.assets.secondary_assets[0].asset_id == "tool", "assembly registration did not convert equipment to secondary assets"): return
-	if not _check(registered_assembly.manifest.assets.preview_readability.status == "pending", "assembly registration should record pending preview evidence"): return
+	if not _check(registered_assembly.manifest.assets.preview_readability.status == "valid", "assembly registration should record valid preview evidence"): return
+	if not _check(registered_assembly.manifest.assets.customization.meaningful_difference.status == "partial", "assembly registration did not record customization evidence"): return
+	if not _check(registered_assembly.manifest.assets.preview_thumbnails.has(preview_path), "assembly registration did not record preview thumbnail"): return
 	if not _check(registered_assembly.checkpoint_index.stages.assembly.status == "valid", "assembly checkpoint was not valid after registration"): return
+	if not _check(registered_assembly.checkpoint_index.stages.assembly.customization.meaningful_difference.status == "partial", "assembly checkpoint did not record customization evidence"): return
 	if not _check(registered_assembly.checkpoint_index.stages.godot_scene.status == "valid", "Godot scene checkpoint was not valid after registration"): return
 	if not _check(registered_assembly.checkpoint_index.stages.animation_smoke.status == "valid", "animation checkpoint was not valid after registration"): return
-	if not _check(registered_assembly.checkpoint_index.stages.readability.status == "pending", "readability checkpoint should remain pending"): return
+	if not _check(registered_assembly.checkpoint_index.stages.readability.status == "valid", "readability checkpoint should be valid"): return
 	if not _check(FileAccess.file_exists(test_root.path_join("characters/draft_character/draft_character.tscn")), "assembly registration did not write Godot scene wrapper"): return
 	var scene_text := _read_text(test_root.path_join("characters/draft_character/draft_character.tscn"))
 	if not _check(scene_text.contains("AnimationPlayer"), "assembly registration did not add an AnimationPlayer"): return
@@ -264,6 +294,14 @@ func _init() -> void:
 	if not _check(reused_base.checkpoint_index.stages.base_body.status == "valid", "reused base checkpoint should be valid"): return
 	if not _check(reused_base.checkpoint_index.stages.animation_smoke.status == "valid", "reused animation checkpoint should be valid"): return
 	if not _check(reused_base.checkpoint_index.stages.base_body.reused_from.character_id == "draft_character", "reused base provenance was not recorded"): return
+	var stored_recipe = JSON.parse_string(_read_text(test_root.path_join("characters/draft_character/recipes/v2/character_recipe.json")))
+	stored_recipe.material_overrides.slots.body_primary = "changed_body_primary"
+	_write_text(test_root.path_join("characters/draft_character/recipes/v2/character_recipe.json"), JSON.stringify(stored_recipe, "  ") + "\n")
+	var stale_from_customization := store.checkpoint_status("draft_character", "v2")
+	if not _check(stale_from_customization.ok, stale_from_customization.get("error", "checkpoint status after customization failed")): return
+	if not _check(stale_from_customization.checkpoint_index.stages.recipe.status == "stale", "changed customization recipe should mark recipe checkpoint stale"): return
+	if not _check(stale_from_customization.checkpoint_index.stages.assembly.status == "stale", "assembly should become stale when customization recipe changes"): return
+	if not _check(stale_from_customization.checkpoint_index.stages.base_body.status == "valid", "base body should remain valid when only customization changes"): return
 	_write_text(test_root.path_join("characters/draft_character/draft_character.tscn"), scene_text + "\n# changed after checkpoint\n")
 	var stale_checkpoint := store.checkpoint_status("draft_character", "v2")
 	if not _check(stale_checkpoint.ok, stale_checkpoint.get("error", "checkpoint status failed")): return

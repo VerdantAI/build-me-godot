@@ -14,8 +14,8 @@ The builder originated in Inhuman Entertainment's MIT-licensed Burb Sweeper huma
 builder for `3d_isometric_party` characters. It reads a validated
 `character_recipe.json`, imports the project-provided humanoid body as a
 project-local work basis, places approved reference images, creates socket
-empties, adds primitive placeholder equipment, saves a `.blend` work file, and
-writes `assembly_report.json`.
+empties, adds reviewed or explicitly requested equipment, saves a `.blend` work
+file, and writes `assembly_report.json`.
 
 Run it only as an explicit Blender action, for example:
 
@@ -31,6 +31,29 @@ blender -b --factory-startup \
 The script does not install Blender addons, ComfyUI nodes, Python packages,
 model weights, or asset packs. It refuses output directories outside the Godot
 project or inside `addons/build_me_godot/`.
+
+For common hard-surface accessories such as hard hats, belts, clipboards, and
+hand tools, prefer reviewed open assets before procedural generation. Candidate
+sources are recorded in
+`res://addons/build_me_godot/integrations/hard_surface_asset_candidates.json`.
+Procedural accessory geometry is an explicit blockout fallback only; recipes
+must opt into `promote_to_production` before procedural parts are exported as
+production geometry.
+
+Current assemblies also apply character-local humanoid customization from the
+approved recipe. The field-engineer slice uses coarse non-destructive body
+scale controls and material-slot overrides on the imported rigged base. These
+materials are exported as explicit non-emissive Principled/PBR materials so
+Godot imports the character as normal shaded geometry rather than a glowing
+white fallback. If a consuming project still shows the older white character,
+force a GLB reimport or reload the open scene before changing lighting.
+
+The next Blender integration step is reusable-shape resolution. Assembly
+should resolve `source_kind: reusable_shape` from
+`res://build_me_godot/assets/reusable_shapes/`, duplicate or instance the
+reviewed asset into the character-local work file, attach it to the requested
+socket with recipe transforms, and record shape ID, digest, license state, and
+game-mode fit in `assembly_report.json`.
 
 ## Reusable character checkpoints
 

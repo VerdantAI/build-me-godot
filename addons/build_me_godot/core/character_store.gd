@@ -801,6 +801,7 @@ func register_assembly_result(character_id: String, values: Dictionary = {}) -> 
 	if not scene_result.ok:
 		return scene_result
 	var registration_report_path := characters_root.path_join(str(manifest.character_id)).path_join("reports").path_join(recipe_version).path_join("isometric_character_registration.json")
+	var preview_readability := _readability_from_assembly_outputs(outputs, recipe)
 	var registration_report := {
 		"schema_version": SCHEMA_VERSION,
 		"status": "registered",
@@ -814,11 +815,7 @@ func register_assembly_result(character_id: String, values: Dictionary = {}) -> 
 		"equipment": report.get("equipment", []),
 		"animations": _recipe_animation_paths(recipe, manifest),
 		"lod": recipe.get("lod", {}),
-		"preview_readability": {
-			"status": "pending",
-			"required": bool(recipe.get("validation", {}).get("requires_thumbnail_readability", true)),
-			"note": "Isometric thumbnail capture is a later validation step."
-		},
+		"preview_readability": preview_readability,
 		"warnings": report_validation.warnings
 	}
 	var write_result := _write_json(registration_report_path, registration_report)
@@ -833,8 +830,13 @@ func register_assembly_result(character_id: String, values: Dictionary = {}) -> 
 	assets["animations"] = registration_report.animations
 	assets["sockets"] = report.get("sockets", [])
 	assets["materials"] = recipe.get("materials", {})
+	assets["customization"] = {
+		"recipe": _customization_digest_source(recipe),
+		"assembly": report.get("customization", {}),
+		"meaningful_difference": report.get("customization", {}).get("meaningful_difference", {})
+	}
 	assets["lod"] = recipe.get("lod", {})
-	assets["preview_thumbnails"] = []
+	assets["preview_thumbnails"] = [preview_readability.preview] if str(preview_readability.get("status", "")) == "valid" else []
 	assets["preview_readability"] = registration_report.preview_readability
 	assets["secondary_assets"] = _secondary_assets_from_equipment(report.get("equipment", []))
 	manifest["assets"] = assets
@@ -1026,6 +1028,39 @@ func reuse_base_checkpoint(character_id: String, version: String, source_charact
 	return _save_checkpoint_result(loaded, checkpoint)
 
 
+func _readability_from_assembly_outputs(outputs: Dictionary, recipe: Dictionary) -> Dictionary:
+	var required := bool(recipe.get("validation", {}).get("requires_thumbnail_readability", true))
+	var report_path := str(outputs.get("readability_report", "")).strip_edges()
+	var preview_path := str(outputs.get("readability_preview", "")).strip_edges()
+	var warnings := []
+	if report_path.is_empty() and preview_path.is_empty():
+		return {
+			"status": "pending",
+			"required": required,
+			"report": "",
+			"preview": "",
+			"note": "Isometric thumbnail/readability evidence has not been captured."
+		}
+	if report_path.is_empty() or not FileAccess.file_exists(report_path):
+		warnings.append("Readability report is missing: %s" % report_path)
+	if preview_path.is_empty() or not FileAccess.file_exists(preview_path):
+		warnings.append("Readability preview image is missing: %s" % preview_path)
+	var report := _load_json(report_path)
+	if report.is_empty():
+		warnings.append("Readability report could not be parsed.")
+	elif str(report.get("status", "")) != "valid":
+		warnings.append("Readability report status is %s." % str(report.get("status", "missing")))
+	var status := "valid" if warnings.is_empty() else "failed"
+	return {
+		"status": status,
+		"required": required,
+		"report": report_path,
+		"preview": preview_path,
+		"digest": _digest_paths([report_path, preview_path]),
+		"warnings": warnings
+	}
+
+
 func validate_character_recipe_data(recipe: Dictionary) -> Dictionary:
 	var errors := PackedStringArray()
 	var warnings := PackedStringArray()
@@ -1097,6 +1132,19 @@ func validate_character_recipe_data(recipe: Dictionary) -> Dictionary:
 		errors.append("Recipe materials plan is required.")
 	elif str(materials.get("texture_budget", "")).strip_edges().is_empty():
 		errors.append("Recipe materials.texture_budget is required.")
+	var body_variant_validation := _validate_body_variant(recipe.get("body_variant", {}))
+	for error in body_variant_validation.errors:
+		errors.append(str(error))
+	for warning in body_variant_validation.warnings:
+		warnings.append(str(warning))
+	var material_validation := _validate_material_overrides(recipe.get("material_overrides", {}))
+	for error in material_validation.errors:
+		errors.append(str(error))
+	for warning in material_validation.warnings:
+		warnings.append(str(warning))
+	var difference_validation := _validate_meaningful_difference_plan(recipe)
+	for warning in difference_validation.warnings:
+		warnings.append(str(warning))
 	var animation: Dictionary = recipe.get("animation", {})
 	if str(animation.get("profile", "")) != "SkeletonProfileHumanoid":
 		errors.append("Recipe animation.profile must be SkeletonProfileHumanoid.")
@@ -1113,7 +1161,98 @@ func validate_character_recipe_data(recipe: Dictionary) -> Dictionary:
 	return {
 		"status": "failed" if not errors.is_empty() else ("warning" if not warnings.is_empty() else "pass"),
 		"errors": errors,
-		"warnings": warnings
+		"warnings": warnings,
+		"customization": {
+			"body_variant": body_variant_validation,
+			"material_overrides": material_validation,
+			"meaningful_difference": difference_validation
+		}
+	}
+
+
+func _validate_body_variant(body_variant) -> Dictionary:
+	var errors := PackedStringArray()
+	var warnings := PackedStringArray()
+	if not body_variant is Dictionary or body_variant.is_empty():
+		warnings.append("Recipe has no body_variant; character may still read as the original base mesh.")
+		return {"status": "warning", "errors": errors, "warnings": warnings}
+	var provider := str(body_variant.get("provider", "")).strip_edges()
+	if provider.is_empty():
+		errors.append("body_variant.provider is required.")
+	elif provider not in ["project_base_transform_controls", "mpfb_makehuman_external", "manual_reviewed_export"]:
+		errors.append("Unsupported body_variant provider: %s." % provider)
+	if provider == "project_base_transform_controls" and not bool(body_variant.get("non_destructive", false)):
+		errors.append("project_base_transform_controls must be non_destructive.")
+	var controls = body_variant.get("controls", {})
+	if not controls is Dictionary:
+		errors.append("body_variant.controls must be an object.")
+	else:
+		for key in controls.keys():
+			if not _allowed_phase1_body_controls().has(str(key)):
+				warnings.append("Unsupported phase-1 body control will be ignored: %s." % str(key))
+			else:
+				var value := float(controls[key])
+				if value < 0.75 or value > 1.25:
+					warnings.append("Body control %s is outside the conservative phase-1 range: %.3f." % [str(key), value])
+	if provider == "mpfb_makehuman_external":
+		warnings.append("MPFB/MakeHuman body variants require user-managed provider readiness before execution.")
+	return {"status": "failed" if not errors.is_empty() else ("warning" if not warnings.is_empty() else "pass"), "errors": errors, "warnings": warnings}
+
+
+func _validate_material_overrides(overrides) -> Dictionary:
+	var errors := PackedStringArray()
+	var warnings := PackedStringArray()
+	if not overrides is Dictionary or overrides.is_empty():
+		warnings.append("Recipe has no material_overrides; identity will rely on the source base material.")
+		return {"status": "warning", "errors": errors, "warnings": warnings}
+	var provider := str(overrides.get("provider", "recipe_material_slot_overrides")).strip_edges()
+	if provider.is_empty():
+		errors.append("material_overrides.provider is required.")
+	var slot_map = overrides.get("slot_map", _current_base_material_slot_map())
+	if not slot_map is Dictionary or slot_map.is_empty():
+		warnings.append("material_overrides.slot_map is empty; assembly will rely on default material-name matching.")
+	var slots = overrides.get("slots", {})
+	if not slots is Dictionary or slots.is_empty():
+		warnings.append("material_overrides.slots is empty; no visible material identity change is planned.")
+	var fallback := str(overrides.get("fallback_behavior", "warn_and_keep_source_material"))
+	if fallback not in ["warn_and_keep_source_material", "fail_required_slot"]:
+		warnings.append("Unknown material override fallback behavior: %s." % fallback)
+	return {"status": "failed" if not errors.is_empty() else ("warning" if not warnings.is_empty() else "pass"), "errors": errors, "warnings": warnings}
+
+
+func _validate_meaningful_difference_plan(recipe: Dictionary) -> Dictionary:
+	var warnings := PackedStringArray()
+	var material_overrides = recipe.get("material_overrides", {})
+	var material_slots = material_overrides.get("slots", {}) if material_overrides is Dictionary else {}
+	var has_material_identity: bool = material_slots is Dictionary and not material_slots.is_empty()
+	if not has_material_identity:
+		warnings.append("Meaningful customization is missing material identity.")
+	var has_silhouette := false
+	for part in recipe.get("equipment", []):
+		if part is Dictionary and bool(part.get("required", false)):
+			has_silhouette = true
+			if str(part.get("source_kind", "")) in ["placeholder_primitive", "existing_asset_or_placeholder"] and not bool(part.get("promote_to_production", false)):
+				warnings.append("Required silhouette equipment is placeholder-only and cannot prove production customization: %s." % str(part.get("part_id", "")))
+	if not has_silhouette:
+		warnings.append("Meaningful customization is missing silhouette or role equipment.")
+	var body_variant = recipe.get("body_variant", {})
+	if not body_variant is Dictionary or body_variant.is_empty():
+		warnings.append("Meaningful customization is missing body variant evidence.")
+	return {
+		"status": "warning" if not warnings.is_empty() else "pass",
+		"warnings": warnings,
+		"material_identity": has_material_identity,
+		"silhouette_equipment": has_silhouette,
+		"body_variant": body_variant is Dictionary and not body_variant.is_empty()
+	}
+
+
+func _customization_digest_source(recipe: Dictionary) -> Dictionary:
+	return {
+		"body_variant": recipe.get("body_variant", {}),
+		"material_overrides": recipe.get("material_overrides", {}),
+		"equipment": recipe.get("equipment", []),
+		"customization": recipe.get("customization", {})
 	}
 
 
@@ -1247,7 +1386,8 @@ func _default_manifest(character_id: String) -> Dictionary:
 		"assets": {
 			"character_scene": "",
 			"animations": [],
-			"secondary_assets": []
+			"secondary_assets": [],
+			"customization": {}
 		},
 		"licenses": [],
 		"created_at": now,
@@ -1289,7 +1429,8 @@ func _normalize_manifest(manifest: Dictionary) -> Dictionary:
 		manifest["assets"] = {
 			"character_scene": "",
 			"animations": [],
-			"secondary_assets": []
+			"secondary_assets": [],
+			"customization": {}
 		}
 	if not manifest.has("conformance") or not (manifest.conformance is Dictionary):
 		manifest["conformance"] = {
@@ -1370,6 +1511,8 @@ func _build_character_recipe(manifest: Dictionary, run: Dictionary, reference_ve
 	var targets := _field_engineer_targets(manifest, run)
 	var equipment := _recipe_equipment_from_targets(targets, values)
 	var sockets := _recipe_sockets_for_equipment(equipment)
+	var body_variant := _recipe_body_variant(manifest, values)
+	var material_overrides := _recipe_material_overrides(targets, values)
 	var rigged_meshes := _rigged_meshes_from_values(manifest)
 	var body_provider := str(values.get("body_provider", "project_rigged_meshes")).strip_edges()
 	if body_provider.is_empty():
@@ -1413,6 +1556,7 @@ func _build_character_recipe(manifest: Dictionary, run: Dictionary, reference_ve
 			"morph_targets": {},
 			"manual_review_required": []
 		},
+		"body_variant": body_variant,
 		"equipment": equipment,
 		"sockets": sockets,
 		"materials": {
@@ -1421,6 +1565,8 @@ func _build_character_recipe(manifest: Dictionary, run: Dictionary, reference_ve
 			"texture_budget": str(values.get("texture_budget", "medium")),
 			"atlas_group": str(values.get("atlas_group", "isometric_party_humanoid_v1"))
 		},
+		"material_overrides": material_overrides,
+		"customization": _recipe_customization_plan(body_variant, material_overrides, equipment),
 		"animation": {
 			"profile": "SkeletonProfileHumanoid",
 			"required_clips": ["idle", "walk"],
@@ -1482,6 +1628,96 @@ func _recipe_equipment_from_targets(targets: Dictionary, values: Dictionary) -> 
 	if equipment.is_empty():
 		equipment.append(_recipe_equipment_part("role_prop", "hybrid_character_prop", "primitive", "hand_r", true, "placeholder_primitive"))
 	return equipment
+
+
+func _recipe_body_variant(manifest: Dictionary, values: Dictionary) -> Dictionary:
+	if values.has("body_variant") and values.body_variant is Dictionary:
+		return values.body_variant
+	var role_text := str(manifest.get("metadata", {}).get("role", "")).to_lower()
+	var controls := {
+		"height_scale": 1.0,
+		"shoulder_width": 1.0,
+		"torso_width": 1.0,
+		"head_scale": 1.0,
+		"limb_thickness": 1.0
+	}
+	if _contains_any(role_text, ["engineer", "worker", "construction", "mechanic"]):
+		controls = {
+			"height_scale": 0.98,
+			"shoulder_width": 1.05,
+			"torso_width": 1.04,
+			"head_scale": 0.98,
+			"limb_thickness": 1.03
+		}
+	return {
+		"provider": "project_base_transform_controls",
+		"variant_id": "%s_body_variant_v1" % str(manifest.get("character_id", "character")),
+		"controls": controls,
+		"allowed_controls": _allowed_phase1_body_controls(),
+		"non_destructive": true,
+		"limitations": [
+			"coarse object-level transforms only",
+			"not a semantic body morph provider",
+			"source base mesh and rig must remain unchanged"
+		]
+	}
+
+
+func _allowed_phase1_body_controls() -> Array[String]:
+	return ["height_scale", "shoulder_width", "torso_width", "head_scale", "limb_thickness"]
+
+
+func _recipe_material_overrides(targets: Dictionary, values: Dictionary) -> Dictionary:
+	if values.has("material_overrides") and values.material_overrides is Dictionary:
+		return values.material_overrides
+	var colors: Array = targets.get("colors", [])
+	var families: Array = targets.get("materials", [])
+	return {
+		"provider": "recipe_material_slot_overrides",
+		"slot_map": _current_base_material_slot_map(),
+		"slots": {
+			"skin": "field_engineer_skin_sun_tan_light",
+			"hair": "field_engineer_hair_brown",
+			"eyes": "field_engineer_eye_brown",
+			"body_primary": "field_engineer_canvas_jacket_olive",
+			"body_secondary": "field_engineer_safety_yellow",
+			"rubber_or_leather": "field_engineer_boot_dark"
+		},
+		"palette": colors,
+		"material_families": families,
+		"fallback_behavior": "warn_and_keep_source_material",
+		"limitations": [
+			"phase-1 overrides use local material colors and existing material slots",
+			"texture repainting and UV-aware decals are not implemented in this pass"
+		]
+	}
+
+
+func _current_base_material_slot_map() -> Dictionary:
+	return {
+		"body_primary": ["MI_Superhero_Male", "SuperHero_Male"],
+		"skin": ["MI_Superhero_Male", "SuperHero_Male"],
+		"hair": ["MI_Hair_1", "Eyebrows"],
+		"eyes": ["MI_Eyes", "Eyes"]
+	}
+
+
+func _recipe_customization_plan(body_variant: Dictionary, material_overrides: Dictionary, equipment: Array) -> Dictionary:
+	return {
+		"schema_version": 1,
+		"status": "planned",
+		"layers": {
+			"body_variant": body_variant,
+			"material_overrides": material_overrides,
+			"silhouette_equipment": equipment
+		},
+		"meaningful_difference_requirements": [
+			"material identity",
+			"silhouette or role equipment",
+			"body proportion or documented provider limitation",
+			"isometric readability evidence"
+		]
+	}
 
 
 func _recipe_equipment_part(part_id: String, taxonomy: String, representation: String, socket: String, required: bool, source_kind: String) -> Dictionary:
@@ -1791,6 +2027,8 @@ func _merge_current_checkpoint_stages(checkpoint: Dictionary, manifest: Dictiona
 		"godot_import_asset": str(report.get("outputs", {}).get("godot_import_asset", manifest.get("assets", {}).get("godot_import_asset", ""))),
 		"blender_work_file": str(report.get("outputs", {}).get("blender_work_file", "")),
 		"digest": _digest_paths([report_path, str(report.get("outputs", {}).get("godot_import_asset", ""))]),
+		"customization_digest": _digest_value(_customization_digest_source(recipe)),
+		"customization": report.get("customization", recipe.get("customization", {})),
 		"inputs": ["base_body", "references", "recipe"],
 		"warnings": report.get("warnings", []) if report.get("warnings", []) is Array else []
 	})
@@ -1803,12 +2041,7 @@ func _merge_current_checkpoint_stages(checkpoint: Dictionary, manifest: Dictiona
 		"warnings": [] if not scene_path.is_empty() and FileAccess.file_exists(scene_path) else ["Godot character scene is missing."]
 	})
 	stages["animation_smoke"] = _merge_checkpoint_stage(stages.get("animation_smoke", {}), _animation_checkpoint_stage(animation_paths))
-	stages["readability"] = _merge_checkpoint_stage(stages.get("readability", {}), {
-		"status": "pending",
-		"report": "",
-		"inputs": ["godot_scene"],
-		"warnings": ["Isometric thumbnail/readability evidence has not been captured."]
-	})
+	stages["readability"] = _merge_checkpoint_stage(stages.get("readability", {}), _readability_checkpoint_stage(manifest))
 	checkpoint["stages"] = stages
 	checkpoint["updated_at"] = Time.get_datetime_string_from_system(true)
 	return checkpoint
@@ -1887,7 +2120,7 @@ func _mark_dependents_stale(changed_stage: String, stages: Dictionary, stale: Di
 
 func _stage_paths(stage: Dictionary) -> Array:
 	var paths := []
-	for key in ["path", "report", "godot_import_asset"]:
+	for key in ["path", "report", "preview", "godot_import_asset"]:
 		var path := str(stage.get(key, "")).strip_edges()
 		if not path.is_empty() and _is_project_data_path(path):
 			paths.append(path)
@@ -1935,6 +2168,33 @@ func _base_body_checkpoint_stage(manifest: Dictionary, recipe: Dictionary) -> Di
 		"game_mode_fit": [DEFAULT_ISOMETRIC_PROFILE],
 		"animation_compatible": status == "valid",
 		"inputs": [],
+		"warnings": warnings
+	}
+
+
+func _readability_checkpoint_stage(manifest: Dictionary) -> Dictionary:
+	var assets: Dictionary = manifest.get("assets", {})
+	var preview: Dictionary = assets.get("preview_readability", {})
+	var status := str(preview.get("status", "pending"))
+	var report_path := str(preview.get("report", "")).strip_edges()
+	var preview_path := str(preview.get("preview", "")).strip_edges()
+	var warnings := preview.get("warnings", []) if preview.get("warnings", []) is Array else []
+	if status == "valid":
+		if report_path.is_empty() or not FileAccess.file_exists(report_path):
+			status = "missing"
+			warnings = _append_warning(warnings, "Readability report is missing.")
+		if preview_path.is_empty() or not FileAccess.file_exists(preview_path):
+			status = "missing"
+			warnings = _append_warning(warnings, "Readability preview image is missing.")
+	if status == "pending":
+		warnings = _append_warning(warnings, "Isometric thumbnail/readability evidence has not been captured.")
+	return {
+		"status": status,
+		"report": report_path,
+		"preview": preview_path,
+		"digest": _digest_paths([report_path, preview_path]),
+		"inputs": ["godot_scene"],
+		"required": bool(preview.get("required", true)),
 		"warnings": warnings
 	}
 
@@ -2024,6 +2284,10 @@ func _digest_paths(paths: Array) -> String:
 	if parts.is_empty():
 		return ""
 	return "sha256:%s" % "\n".join(parts).sha256_text()
+
+
+func _digest_value(value) -> String:
+	return "sha256:%s" % JSON.stringify(value, "  ").sha256_text()
 
 
 func _append_warning(existing, warning: String) -> Array:

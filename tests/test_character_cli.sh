@@ -123,6 +123,10 @@ jq -e '.manifest.stage == "recipe_draft"' <<<"$recipe_output" >/dev/null
 jq -e '.recipe_path == "res://build_me_godot/characters/field_engineer/recipes/v1/character_recipe.json"' <<<"$recipe_output" >/dev/null
 jq -e '.recipe.reference_version == "v1" and .recipe.game_mode_profile_id == "3d_isometric_party"' <<<"$recipe_output" >/dev/null
 jq -e '.recipe.body.provider == "project_rigged_meshes"' <<<"$recipe_output" >/dev/null
+jq -e '.recipe.body_variant.provider == "project_base_transform_controls"' <<<"$recipe_output" >/dev/null
+jq -e '.recipe.body_variant.non_destructive == true' <<<"$recipe_output" >/dev/null
+jq -e '.recipe.material_overrides.provider == "recipe_material_slot_overrides"' <<<"$recipe_output" >/dev/null
+jq -e '.recipe.material_overrides.slots.body_primary == "field_engineer_canvas_jacket_olive"' <<<"$recipe_output" >/dev/null
 jq -e '.recipe.source.reference_outputs.front == "res://build_me_godot/characters/field_engineer/references/v1/front.png"' <<<"$recipe_output" >/dev/null
 jq -e '.recipe.equipment | any(.part_id == "role_prop" or .socket == "hand_r" or .socket == "hand_l")' <<<"$recipe_output" >/dev/null
 jq -e '.recipe_validation.status == "pass" or .recipe_validation.status == "warning"' <<<"$recipe_output" >/dev/null
@@ -175,8 +179,22 @@ jq -e '.manifest.recipes.selected_version == "v1"' <<<"$approve_recipe_output" >
 jq -e '.available_actions | index("register-assembly:v1")' <<<"$approve_recipe_output" >/dev/null
 
 assembly_dir="$test_root/project/build_me_godot/characters/field_engineer/assembly/v1"
+preview_dir="$test_root/project/build_me_godot/characters/field_engineer/previews/v1"
+report_dir="$test_root/project/build_me_godot/characters/field_engineer/reports/v1"
 install -d "$assembly_dir"
+install -d "$preview_dir" "$report_dir"
 printf 'fake glb bytes' > "$assembly_dir/field_engineer_v1_isometric_assembly.glb"
+printf 'fake png bytes' > "$preview_dir/isometric_readability.png"
+cat > "$report_dir/isometric_readability.json" <<'JSON'
+{
+  "schema_version": 1,
+  "status": "valid",
+  "character_id": "field_engineer",
+  "recipe_version": "v1",
+  "preview": "res://build_me_godot/characters/field_engineer/previews/v1/isometric_readability.png",
+  "resolution": [512, 512]
+}
+JSON
 cat > "$assembly_dir/assembly_report.json" <<'JSON'
 {
   "schema_version": 1,
@@ -195,10 +213,18 @@ cat > "$assembly_dir/assembly_report.json" <<'JSON'
   "equipment": [
     {"part_id": "tool", "socket": "hand_r", "representation": "primitive", "object": "EQUIP_tool"}
   ],
+  "customization": {
+    "schema_version": 1,
+    "body_variant": {"status": "applied", "provider": "project_base_transform_controls"},
+    "material_overrides": {"status": "applied", "applied_slots": {"body_primary": [{"object": "Body"}]}},
+    "meaningful_difference": {"status": "partial", "material_identity": true, "body_variant": true, "silhouette_equipment": false}
+  },
   "outputs": {
     "blender_work_file": "res://build_me_godot/characters/field_engineer/assembly/v1/field_engineer_v1_isometric_assembly.blend",
     "godot_import_asset": "res://build_me_godot/characters/field_engineer/assembly/v1/field_engineer_v1_isometric_assembly.glb",
-    "assembly_report": "res://build_me_godot/characters/field_engineer/assembly/v1/assembly_report.json"
+    "assembly_report": "res://build_me_godot/characters/field_engineer/assembly/v1/assembly_report.json",
+    "readability_preview": "res://build_me_godot/characters/field_engineer/previews/v1/isometric_readability.png",
+    "readability_report": "res://build_me_godot/characters/field_engineer/reports/v1/isometric_readability.json"
   }
 }
 JSON
@@ -215,14 +241,18 @@ jq -e '.manifest.stage == "assembly_registered"' <<<"$register_assembly_output" 
 jq -e '.manifest.assets.character_scene == "res://build_me_godot/characters/field_engineer/field_engineer.tscn"' <<<"$register_assembly_output" >/dev/null
 jq -e '.manifest.assets.godot_import_asset == "res://build_me_godot/characters/field_engineer/assembly/v1/field_engineer_v1_isometric_assembly.glb"' <<<"$register_assembly_output" >/dev/null
 jq -e '.manifest.assets.animations | index("res://addons/build_me_godot/examples/quaternius_ik_rigged/UAL1_Standard.animation_library.tres")' <<<"$register_assembly_output" >/dev/null
-jq -e '.manifest.assets.preview_readability.status == "pending"' <<<"$register_assembly_output" >/dev/null
+jq -e '.manifest.assets.preview_readability.status == "valid"' <<<"$register_assembly_output" >/dev/null
+jq -e '.manifest.assets.customization.meaningful_difference.status == "partial"' <<<"$register_assembly_output" >/dev/null
+jq -e '.manifest.assets.preview_thumbnails | index("res://build_me_godot/characters/field_engineer/previews/v1/isometric_readability.png")' <<<"$register_assembly_output" >/dev/null
 jq -e '.registration_report.status == "registered"' <<<"$register_assembly_output" >/dev/null
 jq -e '.registration_report.animations | index("res://addons/build_me_godot/examples/quaternius_ik_rigged/UAL1_Standard.animation_library.tres")' <<<"$register_assembly_output" >/dev/null
 jq -e '.checkpoint_path == "res://build_me_godot/characters/field_engineer/checkpoints/v1/checkpoint_index.json"' <<<"$register_assembly_output" >/dev/null
 jq -e '.checkpoint_index.stages.base_body.status == "valid"' <<<"$register_assembly_output" >/dev/null
 jq -e '.checkpoint_index.stages.assembly.status == "valid"' <<<"$register_assembly_output" >/dev/null
+jq -e '.checkpoint_index.stages.assembly.customization.meaningful_difference.status == "partial"' <<<"$register_assembly_output" >/dev/null
+jq -e '.checkpoint_index.stages.assembly.customization_digest | startswith("sha256:")' <<<"$register_assembly_output" >/dev/null
 jq -e '.checkpoint_index.stages.animation_smoke.status == "valid"' <<<"$register_assembly_output" >/dev/null
-jq -e '.checkpoint_index.stages.readability.status == "pending"' <<<"$register_assembly_output" >/dev/null
+jq -e '.checkpoint_index.stages.readability.status == "valid"' <<<"$register_assembly_output" >/dev/null
 test -f "$test_root/project/build_me_godot/characters/field_engineer/field_engineer.tscn"
 test -f "$test_root/project/build_me_godot/characters/field_engineer/reports/v1/isometric_character_registration.json"
 test -f "$test_root/project/build_me_godot/characters/field_engineer/checkpoints/v1/checkpoint_index.json"
